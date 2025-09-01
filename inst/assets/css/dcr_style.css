@@ -1,0 +1,11 @@
+.tick {
+    font-size: 15px;
+}
+.well {
+    background-color: #0078f01E;
+    margin-top: 15px;
+}
+
+div[role="main"] {
+    padding: 0px;
+}

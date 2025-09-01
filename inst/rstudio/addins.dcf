@@ -1,0 +1,15 @@
+Name: Scatter
+Description: Scatter Plot Data Generator
+Binding: scatter_dcr
+Interactive: true
+
+Name: Boxplot
+Description: Boxplot Data Generator
+Binding: boxplot_dcr
+Interactive: true
+
+Name: Histogram
+Description: Histogram Data Generator
+Binding: histogram_dcr
+Interactive: true
+
