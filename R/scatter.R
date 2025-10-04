@@ -38,7 +38,7 @@
 #' @export
 
 scatter_dcr <- function() {
-  grp = setNames(seq(10), paste0('G', seq(10)))
+  grp = stats::setNames(paste0('G', seq(10)), paste0('G', seq(10)))
   dcr_col = DataCraftR:::palette()
   addResourcePath("assets", system.file("assets", package = "DataCraftR"))
   
@@ -46,12 +46,12 @@ scatter_dcr <- function() {
     # titlePanel('Scatter - '),
     title = 'Scatter',
     tags$link(rel = 'stylesheet', type = 'text/css', href = 'assets/css/dcr_style.css'),
-    tags$script(src="https://cdn.jsdelivr.net/npm/d3@7"),
+    tags$script(src="https://d3js.org/d3.v7.min.js"),
     
     sidebarLayout(
       sidebarPanel(
         width = 3,
-        tags$h3('Scatter - '),
+        # tags$h3('Scatter - '),
         
         radioGroupButtons(
           's_grp_id',
@@ -64,10 +64,11 @@ scatter_dcr <- function() {
         sliderInput(
           's_size_id',
           'Brush diameter',
-          min = 0.0,
-          max = 0.5,
-          value = 0.1,
-          step = 0.05
+          min = 0,
+          max = 50,
+          value = 10,
+          step = 5,
+          post = '%'
         ),
         
         tags$hr(),
@@ -87,26 +88,30 @@ scatter_dcr <- function() {
             icon = bs_icon('code-slash'),
             type = 'success',
           ),
-          
-          dropdown(
-            label = tags$html(bs_icon('gear')),
-            width = '100%',
-            sliderInput(
-              's_ngrp_id',
-              label = 'Numer of Groups',
-              min = 1,
-              max = 10,
-              value = 3,
-              step = 1,
-              ticks = F
-            ),
-            numericInput('s_xm_id', 'max x', 1, min = 1),
-            numericInput('s_ym_id', 'max y', 1, min = 1),
-          ),
-          input_task_button('done', 'Close', icon = bs_icon('x-square'), type = 'danger')
         ),
         
-        tags$h3(id = 's_txt_id', 0),
+        tags$br(),
+        dropdown(
+          label = tags$html(bs_icon('gear')),
+          width = '100%',
+          sliderInput(
+            's_ngrp_id',
+            label = 'Numer of Groups',
+            min = 1,
+            max = 10,
+            value = 3,
+            step = 1,
+            ticks = F
+          ),
+          numericInput('s_xm_id', 'max x', 1, min = 1),
+          numericInput('s_ym_id', 'max y', 1, min = 1),
+        ),
+        
+        
+        tags$div(class = 'cards-container', uiOutput('s_txt_id')),
+        
+        input_task_button('done', 'Close', icon = bs_icon('x-square'), type = 'danger'),
+        
         verbatimTextOutput('print_id')
       ),
       
@@ -123,8 +128,23 @@ scatter_dcr <- function() {
     ))
   
   server <- function(input, output, session) {
-    params = reactiveVal()
     data_tot = reactiveVal()
+    name_save = reactiveVal(FALSE)
+    
+    params = reactive({
+      req(input$s_ngrp_id, input$s_grp_id, input$s_size_id, input$s_xm_id, input$s_ym_id)
+      
+      color_idx <- match(input$s_grp_id, names(grp))
+      
+      list(
+        ng = input$s_ngrp_id,
+        g = input$s_grp_id,
+        c = dcr_col[color_idx],
+        s = input$s_size_id/100,
+        xm = input$s_xm_id,
+        ym = input$s_ym_id
+      )
+    })
     
     observe({
       updateRadioGroupButtons(session, 's_grp_id', choices = {
@@ -132,24 +152,27 @@ scatter_dcr <- function() {
       })
     })
     
+    output$s_txt_id <- renderUI({
+      tg = lapply(seq_len(input$s_ngrp_id), function(i){
+        gi = paste0('G', i)
+        
+        tags$div(
+          class = 'card',
+          style = paste0('background-color: ', dcr_col[i]),
+          tags$span(class = 'title', gi),
+          tags$span(id = paste0('s_gtxt_', gi), class = 'value', 0)
+        )
+      })
+      
+      tagList(tg)
+    })
     
     # # # # # # # # # # # # # # # # # # # # # # # # # # #
     # JS interaction ----
     
-    observe({
-      par_inputs = list(
-        ng = input$s_ngrp_id,
-        g = input$s_grp_id,
-        c = dcr_col[as.numeric(input$s_grp_id)],
-        s = input$s_size_id,
-        xm = input$s_xm_id,
-        ym = input$s_ym_id
-      )
-      
-      params(par_inputs)
+    observeEvent(params(), {
       session$sendCustomMessage('update_params', params())
     })
-    
     
     observeEvent(input$s_reset_id, {
       session$sendCustomMessage('reset_click', list())
@@ -167,21 +190,68 @@ scatter_dcr <- function() {
       session$sendCustomMessage('data_click', list())
     })
     
+    observeEvent(input$s_data_id, {
+      session$sendCustomMessage("data_click", list())
+      
+      observeEvent(data_tot(), {
+        value_name = paste0('data_dcr_', format(Sys.time(), "%Y%m%d%H%M"))
+        DataCraftR:::modaldialog_dcr(value_name)
+        name_save(value_name)
+      })
+    })
+    
     # # # # # # # # # # # # # # # # # # # # # # # # # # #
     # Return Data ----
     
-    observeEvent(input$data_return, {
-      data_js = data.frame(
-        x = unlist(input$data_return$x),
-        y = unlist(input$data_return$y),
-        g = unlist(input$data_return$g)
+    observeEvent(input$data_js, {
+      data = data.frame(
+        x = unlist(input$data_js$x),
+        y = unlist(input$data_js$y),
+        g = unlist(input$data_js$g)
       )
-      data_js = dplyr::arrange(data_js, g)
-      data_tot(data_js)
+      data = dplyr::arrange(data, g)
+      data_tot(data)
       
-      output$print_id <- renderPrint({
-        tidyr::tibble(data_js)
+      # output$print_id <- renderPrint({
+      #   tidyr::tibble(data_js)
+      # })
+    })
+    
+    observeEvent(input$save_id, {
+      var_name = input$var_name_id
+      
+      cat('variable: \"', var_name, '\" to environment\n')
+      assign(var_name, data_tot(), envir = .GlobalEnv)
+      removeModal()
+      
+      # if(exists(var_name) & (name_save() != var_name)){
+      #   DataCraftR:::modaldialog_dcr(var_name)
+      # } 
+      # else {
+      #   cat('variable: ', var_name, ' to environment\n')
+      #   assign(var_name, data_tot(), envir = .GlobalEnv)
+      #   removeModal()
+      # }
+      # name_save(var_name)
+    })
+    
+    observe({
+      req(input$var_name_id)
+      
+      var_name = input$var_name_id
+      
+      output$conf_name_id <- renderPrint({
+        if(var_name %in% names(.GlobalEnv)){
+          tags$h4(
+            tags$i(input$var_name_id),
+            ' already exist in your environment',
+            tags$b('Do you want to overwirte?')
+          )
+        } else {
+          tags$h4('')
+        }
       })
+      
     })
     
     # # # # # # # # # # # # # # # # # # # # # # # # # # #

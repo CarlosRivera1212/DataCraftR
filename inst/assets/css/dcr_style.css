@@ -9,3 +9,28 @@
 div[role="main"] {
     padding: 0px;
 }
+
+
+.cards-container {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.card {
+  padding: 3px 12px;
+  margin: 3px;
+  border-radius: 5px;
+  opacity: 0.6;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+}
+.title {
+  font-size: 14px;
+  color: #333;
+}
+.value {
+  font-size: 20px;
+  font-weight: bold;
+}

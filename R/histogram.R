@@ -243,7 +243,7 @@ histogram_dcr <- function() {
       data = list()
       for (i in seq(nv)) {
         x_i = mapply(function(h, a, b) {
-          runif(h, a, b)
+          stats::runif(h, a, b)
         }, h = h_js[[i]], a = li, b = ls)
         
         data[[paste0('V', i)]] = unlist(x_i)

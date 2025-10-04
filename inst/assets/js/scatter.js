@@ -10,10 +10,18 @@ const margin = 30;
 const xMax = xSize - margin * 2;
 const yMax = ySize - margin * 2;
 
+
+//   //   //   //   //   //   //   //   //
 // SHINY EVENTS
 
 Shiny.addCustomMessageHandler("update_params", (new_params) => {
+  if (params.ng != new_params.ng) {
+    reset_all();
+  }
+
   params = new_params;
+  
+  update_ax();
   console.log(params);
 });
 
@@ -25,7 +33,7 @@ Shiny.addCustomMessageHandler("reset_click", (msg) => {
     circ_list = [];
     circ_redo = [];
 
-    data_count();
+    update_count();
   }
 });
 
@@ -35,7 +43,7 @@ Shiny.addCustomMessageHandler("undo_click", (msg) => {
     l.forEach((c) => c.remove());
     circ_redo.push(l);
 
-    data_count();
+    update_count();
   }
 });
 
@@ -45,7 +53,7 @@ Shiny.addCustomMessageHandler("redo_click", (msg) => {
     l.forEach((c) => svg_rec.node().appendChild(c.node()));
     circ_list.push(l);
 
-    data_count();
+    update_count();
   }
 });
 
@@ -56,20 +64,20 @@ Shiny.addCustomMessageHandler("data_click", (msg) => {
     let cg = [];
 
     //let cx = circ_list.flatMap(g =>
-    //  g.map(e => e._groups[0][0].attributes.cx.value)
+    //  g.map(e => e.attr('cx'))
     //);
 
     circ_list.forEach((g) => {
       g.forEach((e) => {
-        cx.push(x.invert(e._groups[0][0].attributes.cx.value));
-        cy.push(y.invert(e._groups[0][0].attributes.cy.value));
-        cg.push(e._groups[0][0].attributes.grp.value);
+        cx.push(x.invert(e.attr('cx')));
+        cy.push(y.invert(e.attr('cy')));
+        cg.push(e.attr('grp'));
       });
     });
 
     let data = { x: cx, y: cy, g: cg };
-    Shiny.setInputValue("data_return", data);
-    console.log("DATA RETURN", data);
+    Shiny.setInputValue("data_js", data);
+    console.log("DATA RETURN");
   }
 });
 
@@ -91,13 +99,18 @@ const svg_hov = svg.append("g").attr("class", "hov");
 const x = d3.scaleLinear().domain([0, params.xm]).range([0, xMax]);
 //svg.append("g").attr("transform", "translate(0," + yMax + ")").call(d3.axisBottom(x));
 //svg.append("g").call(d3.axisTop(x));
-svg_bg
+const x_axis = svg_bg
   .append("g")
   .attr("transform", "translate(0," + yMax + ")")
   .call(d3.axisBottom(x));
 
 const y = d3.scaleLinear().domain([0, params.ym]).range([yMax, 0]);
-svg_bg.append("g").call(d3.axisLeft(y));
+const y_axis = svg_bg
+  .append("g")
+  .attr("transform", "translate(0,0)")
+  .call(d3.axisLeft(y));
+
+
 
 const cir_hov = svg_hov
   .append("circle")
@@ -121,6 +134,16 @@ let circ_redo = [];
 let dragging = false;
 let circ_grp = 0;
 let data_last = [];
+
+
+const handleDragEnd = () => {
+  dragging = false;
+  if (circ_last.length > 0) {
+    circ_list.push(circ_last);
+    circ_last = [];
+  }
+};
+
 
 rec_clk
   .on("mousedown", (event) => {
@@ -164,35 +187,59 @@ rec_clk
         circ_last.push(new_circ);
         // data.push({x:x.invert(rmx), y:y.invert(rmy), g:params.g});
 
-        data_count();
+        const txt = document.getElementById("s_gtxt_"+params.g);
+        txt.textContent = parseInt(txt.textContent)+1;
       }
     }
   })
-  .on("mouseup", () => {
-    dragging = false;
-    if (circ_last.length > 0) {
-      circ_list.push(circ_last);
-      circ_last = [];
-    }
-    data_count();
-  })
-  .on("mouseleave", () => {
-    dragging = false;
-    if (circ_last.length > 0) {
-      circ_list.push(circ_last);
-      circ_last = [];
+  .on("mouseup", handleDragEnd)
+  .on("mouseleave", handleDragEnd);
+
+// FUNCTIONS
+// function data_count() {
+//   const txt = document.getElementById("s_txt_id");
+//   arr_len = circ_list.map((arr) => arr.length);
+//   tot_len = 0;
+//   for (let i of arr_len) {
+//     tot_len += i;
+//   }
+//   txt.textContent = tot_len + circ_last.length;
+// }
+
+function update_count() {
+
+  let circ_flat = circ_list.flat();
+  
+  let counts = {};
+  for (let i = 1; i <= params.ng; i++) {
+    counts['G' + i] = 0;
+  }
+
+  circ_flat.forEach(c => {
+    const group = c.attr("grp");
+    if (counts.hasOwnProperty(group)) {
+      counts[group]++;
     }
   });
 
-// FUNCTIONS
-function data_count() {
-  const txt = document.getElementById("s_txt_id");
-  arr_len = circ_list.map((arr) => arr.length);
-  tot_len = 0;
-  for (let i of arr_len) {
-    tot_len += i;
+  for (const gn in counts) {
+    const txtElement = document.getElementById("s_gtxt_" + gn);
+    if (txtElement) {
+      txtElement.textContent = counts[gn];
+    }
   }
-  txt.textContent = tot_len + circ_last.length;
+}
+
+function reset_all(){
+  if (circ_list.length > 0) {
+    circ_list.forEach(function (circ_grp) {
+      circ_grp.forEach((c) => c.remove());
+    });
+    circ_list = [];
+    circ_redo = [];
+
+    update_count();
+  }
 }
 
 // Shiny.addCustomMessageHandler("reload_js", function(message) {
@@ -202,3 +249,11 @@ function data_count() {
 //   // Vuelve a ejecutar tu inicialización de scatter
 //   initScatter();
 // });
+
+function update_ax() {
+  x.domain([0, params.xm]);
+  x_axis.transition().duration(500).call(d3.axisBottom(x));
+
+  y.domain([0, params.ym]);
+  y_axis.transition().duration(500).call(d3.axisLeft(y));
+}

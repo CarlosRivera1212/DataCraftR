@@ -16,4 +16,16 @@ Description: Shiny-based addins to create datasets interactively through graphic
 License: GPL (>= 3)
 Encoding: UTF-8
 LazyData: true
-RoxygenNote: 7.3.2
+RoxygenNote: 7.3.3
+Imports: 
+    bsicons,
+    bslib,
+    dplyr,
+    RcppColors,
+    rstudioapi,
+    shiny,
+    shinyWidgets,
+    tidyr
+Suggests: 
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
