@@ -32,8 +32,6 @@
 #' @import bslib
 #' @import shinyWidgets
 #' @importFrom bsicons bs_icon
-#' @importFrom dplyr arrange
-#' @importFrom tidyr tibble
 #' @importFrom rstudioapi sendToConsole insertText
 #' @export
 
@@ -110,9 +108,7 @@ scatter_dcr <- function() {
         
         tags$div(class = 'cards-container', uiOutput('s_txt_id')),
         
-        input_task_button('done', 'Close', icon = bs_icon('x-square'), type = 'danger'),
-        
-        verbatimTextOutput('print_id')
+        input_task_button('done', 'Close', icon = bs_icon('x-square'), type = 'danger')
       ),
       
       mainPanel(
@@ -209,12 +205,9 @@ scatter_dcr <- function() {
         y = unlist(input$data_js$y),
         g = unlist(input$data_js$g)
       )
-      data = dplyr::arrange(data, g)
+      data = data[order(data$g), ]
+      rownames(data) = NULL
       data_tot(data)
-      
-      # output$print_id <- renderPrint({
-      #   tidyr::tibble(data_js)
-      # })
     })
     
     observeEvent(input$save_id, {

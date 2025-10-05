@@ -1,7 +1,7 @@
 Package: DataCraftR
 Type: Package
 Title: Create Data Sets Interactively
-Version: 0.1.0
+Version: 0.1.1
 Authors@R: c(
     person(
       "Carlos", "Rivera",
@@ -26,6 +26,3 @@ Imports:
     shiny,
     shinyWidgets,
     tidyr
-Suggests: 
-    testthat (>= 3.0.0)
-Config/testthat/edition: 3
