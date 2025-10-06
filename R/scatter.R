@@ -76,21 +76,26 @@ scatter_dcr <- function() {
           layout_column_wrap(
             width = 1 / 3,
             fill = T,
-            input_task_button('s_reset_id', bs_icon('trash3'), label_busy = ''),
-            input_task_button('s_undo_id', bs_icon('arrow-counterclockwise'), label_busy = ''),
-            input_task_button('s_redo_id', bs_icon('arrow-clockwise'), label_busy = '')
+            input_task_button('s_reset_id', icon('trash-can'), label_busy = ''),
+            input_task_button('s_undo_id', icon('rotate-left'), label_busy = ''),
+            input_task_button('s_redo_id', icon('rotate-right'), label_busy = '')
+            # input_task_button('s_reset_id', bs_icon('trash3'), label_busy = ''),
+            # input_task_button('s_undo_id', bs_icon('arrow-counterclockwise'), label_busy = ''),
+            # input_task_button('s_redo_id', bs_icon('arrow-clockwise'), label_busy = '')
           ),
           input_task_button(
             's_data_id',
             'Data to environment',
-            icon = bs_icon('code-slash'),
+            icon = icon('code'),
+            # icon = bs_icon('code-slash'),
             type = 'success',
           ),
         ),
         
         tags$br(),
         dropdown(
-          label = tags$html(bs_icon('gear')),
+          # label = tags$html(bs_icon('gear')),
+          label = icon('gear'),
           width = '100%',
           sliderInput(
             's_ngrp_id',
@@ -107,8 +112,10 @@ scatter_dcr <- function() {
         
         
         tags$div(class = 'cards-container', uiOutput('s_txt_id')),
-        
-        input_task_button('done', 'Close', icon = bs_icon('x-square'), type = 'danger')
+
+        # input_task_button('done', 'Close', icon = bs_icon('x-square'), type = 'danger'),
+        # input_task_button('done', 'Close', icon = icon('remove-circle', lib = 'glyphicon'), type = 'danger'),
+        input_task_button('done', 'Close', icon = icon('rectangle-xmark'), type = 'danger'),
       ),
       
       mainPanel(

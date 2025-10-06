@@ -20,9 +20,7 @@ RoxygenNote: 7.3.3
 Imports: 
     bsicons,
     bslib,
-    dplyr,
     RcppColors,
     rstudioapi,
     shiny,
-    shinyWidgets,
-    tidyr
+    shinyWidgets
