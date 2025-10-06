@@ -16,18 +16,18 @@ This package is ideal for teaching, demonstrations, or prototyping datasets base
 
 ---
 
-## 🧩 Features
+## :jigsaw: Features
 
-- 🎨 Interactive **Boxplot**: drag quantiles to define distributions.
-- 📊 Interactive **Histogram**: draw bar heights to define data frequency.
-- ⚪ Interactive **Scatter **: paint clusters or point groups directly. 
-- 💾 One-click export of generated data to your R environment.
-- 🧠 Designed as RStudio **Addins** for quick access.
-- ⚙️ Built with **Shiny** and **D3.js** for modern, responsive UI.
+- :takeout_box: Interactive **Boxplot**: drag quantiles to define distributions.
+- :bar_chart: Interactive **Histogram**: draw bar heights to define data frequency.
+- :white_circle: Interactive **Scatter **: paint clusters or point groups directly. 
+- :floppy_disk: One-click export of generated data to your R environment.
+- :brain: Designed as RStudio **Addins** for quick access.
+- :gear:️ Built with **Shiny** and **D3.js** for modern, responsive UI.
 
 ---
 
-## 🚀 Installation
+## :rocket: Installation
 
 ```r
 # From GitHub
@@ -38,7 +38,7 @@ remotes::install_github("your-username/DataCraftR")
 
 ---
 
-## 🧠 Usage
+## :brain: Usage
 
 Each visualization tool can be launched directly from R or from the RStudio Addins menu.
 
@@ -58,7 +58,7 @@ The generated data can be exported to your global environment by clicking **“D
 
 ---
 
-## ⚙️ Technical Notes
+## :gear:️ Technical Notes
 
 - The package integrates **Shiny**, **bslib**, **shinyWidgets**, and **D3.js**.  
 - Custom JavaScript files are located in `inst/assets/js/` and are loaded dynamically by each addin.  
@@ -66,7 +66,7 @@ The generated data can be exported to your global environment by clicking **“D
 
 ---
 
-## 📚 Example Screenshots
+## :books: Example Screenshots
 
 ![Boxplot Addin](man/figures/boxplot_example.png)  
 ![Histogram Addin](man/figures/histogram_example.png)  
@@ -74,21 +74,21 @@ The generated data can be exported to your global environment by clicking **“D
 
 ---
 
-## 🧑 💻 Author
+## :man_technologist: Author
 
 **Carlos Rivera**
-📧 [caariveramo@unal.edu.co](caariveramo@unal.edu.co)
+:email: [caariveramo@unal.edu.co](caariveramo@unal.edu.co)
 
 ---
 
-## 📄 License
+## :scroll: License
 
 This package is licensed under the **GPL-3.0 License**.
 See the `LICENSE` file for more details.
 
 ---
 
-## 💬 Citation
+## :memo: Citation
 
 If you use this package in academic work, please cite it as:
 
@@ -97,7 +97,7 @@ If you use this package in academic work, please cite it as:
 
 ---
 
-## 🧭 Future Directions
+## :compass: Future Directions
 
 - Extend interactivity to line-based density multicategory data.
 - Extend interactivity to line-based temporal data.
