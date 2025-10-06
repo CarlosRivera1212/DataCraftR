@@ -68,9 +68,14 @@ The generated data can be exported to your global environment by clicking **“D
 
 ## :books: Example Screenshots
 
-![Boxplot Addin](man/figures/boxplot_example.png)  
-![Histogram Addin](man/figures/histogram_example.png)  
+#### Scatterplot Example Screenshot
 ![Scatter Addin](man/figures/scatter_example.png)
+
+#### Boxplot Example Screenshot
+![Boxplot Addin](man/figures/boxplot_example.png)  
+
+#### Histogram Example Screenshot
+![Histogram Addin](man/figures/histogram_example.png)  
 
 ---
 
