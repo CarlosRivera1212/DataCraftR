@@ -5,8 +5,15 @@ Version: 0.1.1
 Authors@R: c(
     person(
       "Carlos", "Rivera",
-      email = "caariveramo@unal.edu.co",
-      role = c("aut", "cre")
+      email = "riveramo.carlos@gmail.com",
+      role = c("aut", "cre"),
+      comment = c(ORCID = "0000-0002-3402-7725")
+    ),
+    person(
+      "Heidi", "Renninger",
+      email = "hr427@msstate.edu",
+      role = c("fnd"),
+      comment = c(ORCID = "0000-0002-2485-9835")
     )
   )
 Description: Shiny-based addins to create datasets interactively through graphical 
@@ -14,6 +21,8 @@ Description: Shiny-based addins to create datasets interactively through graphic
     generation, and the resulting datasets are returned to the R environment 
     for analysis or visualization.
 License: GPL (>= 3)
+URL: https://github.com/CarlosRivera1212/DataCraftR
+BugReports: https://github.com/CarlosRivera1212/DataCraftR/issues
 Encoding: UTF-8
 LazyData: true
 RoxygenNote: 7.3.3
