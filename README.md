@@ -68,13 +68,13 @@ The generated data can be exported to your global environment by clicking **“D
 
 ## :books: Example Screenshots
 
-#### Scatterplot Example Screenshot
+#### Screenshot of Scatterplot example
 ![Scatter Addin](man/figures/scatter_example.png)
 
-#### Boxplot Example Screenshot
+#### Screenshot of Boxplot example
 ![Boxplot Addin](man/figures/boxplot_example.png)  
 
-#### Histogram Example Screenshot
+#### Screenshot of Histogram example
 ![Histogram Addin](man/figures/histogram_example.png)  
 
 ---
@@ -104,8 +104,12 @@ If you use this package in academic work, please cite it as:
 
 ## :compass: Future Directions
 
-- Extend interactivity to line-based density multicategory data.
-- Extend interactivity to line-based temporal data.
-- Extend interactivity to proportion bars multicategory data.
-- Extend interactivity to tabular proportions data.
+- [c] count
+- [d] Extend interactivity to line-based density multicategory data.
+- [t] tail
+- [f] density 2D
+- [p] Extend interactivity to proportion bars multicategory data.
+- [t] Extend interactivity to tabular proportions data.
+- [l] Extend interactivity to line-based temporal data.
+- [r] radial
 - Integrate export options to CSV or RDS directly from the UI.  
