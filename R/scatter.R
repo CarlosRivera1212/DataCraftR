@@ -99,7 +99,7 @@ scatter_dcr <- function() {
           width = '100%',
           sliderInput(
             's_ngrp_id',
-            label = 'Numer of Groups',
+            label = 'Number of Groups',
             min = 1,
             max = 10,
             value = 3,
@@ -198,7 +198,7 @@ scatter_dcr <- function() {
       
       observeEvent(data_tot(), {
         value_name = paste0('data_dcr_', format(Sys.time(), "%Y%m%d%H%M"))
-        DataCraftR:::modaldialog_dcr(value_name)
+        DataCraftR:::modaldialog_dcr(value_name, input, output)
         name_save(value_name)
       })
     })
@@ -235,24 +235,24 @@ scatter_dcr <- function() {
       # name_save(var_name)
     })
     
-    observe({
-      req(input$var_name_id)
-      
-      var_name = input$var_name_id
-      
-      output$conf_name_id <- renderPrint({
-        if(var_name %in% names(.GlobalEnv)){
-          tags$h4(
-            tags$i(input$var_name_id),
-            ' already exist in your environment',
-            tags$b('Do you want to overwirte?')
-          )
-        } else {
-          tags$h4('')
-        }
-      })
-      
-    })
+    # observe({
+    #   req(input$var_name_id)
+    #   
+    #   var_name = input$var_name_id
+    #   
+    #   output$conf_name_id <- renderPrint({
+    #     if(var_name %in% names(.GlobalEnv)){
+    #       tags$h4(
+    #         tags$i(input$var_name_id),
+    #         ' already exist in your environment',
+    #         tags$b('Do you want to overwirte?')
+    #       )
+    #     } else {
+    #       tags$h4('')
+    #     }
+    #   })
+    #   
+    # })
     
     # # # # # # # # # # # # # # # # # # # # # # # # # # #
     # Close ----

@@ -47,7 +47,7 @@ boxplot_dcr <- function() {
         tags$h3("Boxplot - "),
         sliderInput(
           "b_nvar_id",
-          label = "Numer of Variables",
+          label = "Number of Variables",
           min = 1,
           max = 10,
           value = 4,

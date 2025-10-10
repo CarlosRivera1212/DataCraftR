@@ -125,7 +125,7 @@ const y_axis = svg_bg
   .attr("transform", "translate(0,0)")
   .call(d3.axisLeft(y));
 
-const rec_clk = svg_rec
+const rec_bg = svg_bg
   .append("rect")
   .attr("width", xMax)
   .attr("height", yMax)

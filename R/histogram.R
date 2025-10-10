@@ -104,7 +104,7 @@ histogram_dcr <- function() {
             width = '100%',
             sliderInput(
               'h_nv_id',
-              label = 'Numer of Variables',
+              label = 'Number of Variables',
               min = 1,
               max = 10,
               value = 3,

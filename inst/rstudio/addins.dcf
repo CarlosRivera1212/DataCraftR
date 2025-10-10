@@ -13,3 +13,8 @@ Description: Histogram Data Generator
 Binding: histogram_dcr
 Interactive: true
 
+Name: Count
+Description: Count Barplot Data Generator
+Binding: count_dcr
+Interactive: true
+

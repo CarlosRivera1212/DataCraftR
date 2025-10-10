@@ -17,6 +17,38 @@ const yMax = ySize - margin * 2;
 //   //   //   //   //   //   //   //   //
 // SHINY EVENTS
 
+Shiny.addCustomMessageHandler("update_params", (new_par) => {
+  par.nv = new_par.nv;
+  par.cat = new_par.cat;
+  par.col = new_par.col;
+
+  update_ax_x();
+  create_bars();
+});
+
+Shiny.addCustomMessageHandler("update_y", (new_ymx) => {
+  par.ymx = new_ymx;
+  update_ax_y();
+});
+
+Shiny.addCustomMessageHandler("align", (al) => {
+  update_align(al);
+});
+
+
+Shiny.addCustomMessageHandler("data_click", (_) => {
+  let count_tot = [];
+    
+  svg_rec.selectAll(".bar").each(function () {
+    let yi = d3.select(this).attr("y");
+    let ci = Math.round(y.invert(yi));
+    count_tot.push(ci);
+  });
+  
+  Shiny.setInputValue("data_js", count_tot);
+  console.log("DATA RETURN");
+});
+
 //   //   //   //   //   //   //   //   //
 // INIT PLOT
 
@@ -51,6 +83,15 @@ const y_axis = svg_bg
   .attr("transform", "translate(0,0)")
   .call(d3.axisLeft(y));
 
+
+const rec_bg = svg_bg
+  .append("rect")
+  .attr("width", xMax)
+  .attr("height", yMax)
+  .attr("fill", "#0078f01E")
+  // .attr("opacity", 0.05)
+  .style("pointer-events", "none");
+
 const hl_hov = svg_hov
   .append("line")
   .attr("x1", x(0))
@@ -67,9 +108,6 @@ const rec_clk = svg_hov
 
 //   //   //   //   //   //   //   //   //
 // MOUSE
-
-update_ax();
-create_bars();
 
 let dragging = false;
 rec_clk
@@ -109,8 +147,8 @@ function create_bars() {
     for (let vi = 0; vi < par.nv; vi++) {
       let v_n = "V" + (vi + 1);
 
-      let yr = Math.ceil(Math.random() * par.ymx);
-      // let yr = 5;
+      // let yr = Math.ceil(Math.random() * par.ymx);
+      let yr = 5;
 
       svg_rec
         .append("rect")
@@ -160,44 +198,72 @@ function bar_edit(xcoord, ycoord) {
   });
 }
 
-function update_ax() {
+function update_ax_x() {
   x.domain(par.cat);
   x_axis.transition().duration(500).call(d3.axisBottom(x));
+  par.w_bar = x.bandwidth() / par.nv;
+}
 
+function update_ax_y() {
   y.domain([0, par.ymx]);
   y_axis.transition().duration(500).call(d3.axisLeft(y));
 
-  par.w_bar = x.bandwidth() / par.nv;
+  svg_rec.selectAll(".bar").each(function () {
+    let bi = d3.select(this);
+    let pre_y = y.invert(bi.attr("y"));
+    let ny = y(Math.round(pre_y));
+    bi.attr("y", ny).attr("height", yMax - ny);
+  });
+}
+
+function update_align(al) {
+  let ny = null;
+
+  if (al == "down") {
+    ny = y(0);
+  } else if(al == "mid") {
+    ny = y(Math.round(par.ymx / 2));
+  } else if(al == "up"){
+    ny = y(par.ymx);
+  } else {
+    ny = y(1);
+  }
+
+  svg_rec.selectAll(".bar").each(function () {
+    d3.select(this)
+      .attr("y", ny)
+      .attr("height", yMax - ny);
+  });
 }
 
 function create_legend() {
   svg_leg.selectAll("rect").remove();
   svg_leg.selectAll("circle").remove();
-  svg_leg.selectAll('text').remove();
+  svg_leg.selectAll("text").remove();
 
   svg_leg
-  .append("rect")
-  .attr("x", xMax-50)
-  .attr("width", 50)
-  .attr("y", 5)
-  .attr("height", 20*par.nv + 5)
-  .attr("fill", "#ccc")
-  .attr("opacity", 0.6);
+    .append("rect")
+    .attr("x", xMax - 50)
+    .attr("width", 50)
+    .attr("y", 5)
+    .attr("height", 20 * par.nv + 5)
+    .attr("fill", "#ccc")
+    .attr("opacity", 0.6);
 
   for (let i = 0; i < par.nv; i++) {
     svg_leg
       .append("circle")
-      .attr("cx", xMax-40)
-      .attr("cy", (20 * i)+20)
+      .attr("cx", xMax - 40)
+      .attr("cy", 20 * i + 20)
       .attr("r", 6)
       .style("fill", par.col[i]);
 
     svg_leg
       .append("text")
-      .attr("x", xMax-30)
-      .attr("y", (20 * i)+20)
+      .attr("x", xMax - 30)
+      .attr("y", 20 * i + 20)
       .attr("fill", "#333")
-      .text('V'+(i+1))
+      .text("V" + (i + 1))
       .style("font-size", "15px")
       .attr("alignment-baseline", "middle");
   }
