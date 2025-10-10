@@ -2,7 +2,6 @@
 .Rhistory
 .RData
 .Ruserdata
-test/
 .httr-oauth
 .DS_Store
 .quarto
