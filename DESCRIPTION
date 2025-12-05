@@ -1,6 +1,6 @@
 Package: DataCraftR
 Type: Package
-Title: Create Data Sets Interactively
+Title: Create datasets interactively
 Version: 0.2.1
 Authors@R: c(
     person(
@@ -16,10 +16,10 @@ Authors@R: c(
       comment = c(ORCID = "0000-0002-2485-9835")
     )
   )
-Description: Shiny-based addins to create datasets interactively through graphical 
-    interfaces. Users can adjust plot elements to set parameters for data 
-    generation, and the resulting datasets are returned to RDS temporal files 
-    for analysis or visualization.
+Description: Shiny-based add-ons for interactively creating datasets through
+  graphical interfaces. Users can adjust graph elements to set data generation
+  parameters, and the resulting datasets can be saved to temporary RDS files
+  for analysis or visualization.
 License: GPL (>= 3)
 URL: https://github.com/CarlosRivera1212/DataCraftR
 BugReports: https://github.com/CarlosRivera1212/DataCraftR/issues
