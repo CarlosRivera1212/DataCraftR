@@ -3,7 +3,8 @@
 #' @title Scatter Plot Data Generator
 #' @description
 #' Launches an interactive Shiny gadget to generate synthetic data by drawing points on a scatter plot.
-#' Users can control the number of groups, brush size, and axis limits, and export the generated data to the R environment.
+#' Users can control the number of groups, brush size, and axis limits.
+#' The resulting dataset can be exported to rds file with one click.
 #'
 #' @details
 #' This gadget integrates Shiny and D3.js for dynamic scatter plot visualization.
@@ -18,8 +19,8 @@
 #' The D3.js code handles drawing and interactivity, while Shiny manages user inputs and server-side data handling.
 #'
 #' @return
-#' Invisibly returns NULL. The main purpose is to launch the interactive gadget.
-#' Generated data is available in the `data_tot` reactive and printed as a tibble in the Shiny gadget.
+#' A Shiny gadget interface is launched.\
+#' The generated data are saved into temporal rds file
 #'
 #' @examples
 #' \dontrun{
@@ -28,11 +29,16 @@
 #' }
 #'
 #' @author Carlos Rivera
+#' 
 #' @import shiny
 #' @import bslib
 #' @import shinyWidgets
 #' @importFrom bsicons bs_icon
 #' @importFrom rstudioapi sendToConsole insertText
+#'
+#' @seealso
+#' Other DataCraftR generation tools:
+#' \code{\link{boxplot_dcr}}, \code{\link{histogram_dcr}}, \code{\link{count_dcr}}
 #' @export
 
 scatter_dcr <- function() {
@@ -85,7 +91,7 @@ scatter_dcr <- function() {
           ),
           input_task_button(
             's_data_id',
-            'Data to environment',
+            label = 'Save Data',
             icon = icon('code'),
             # icon = bs_icon('code-slash'),
             type = 'success',
@@ -196,11 +202,17 @@ scatter_dcr <- function() {
     observeEvent(input$s_data_id, {
       session$sendCustomMessage("data_click", list())
       
+      # observeEvent(data_tot(), {
+      #   value_name = paste0('data_dcr_', format(Sys.time(), "%Y%m%d%H%M"))
+      #   DataCraftR:::modaldialog_dcr(value_name, input, output)
+      #   name_save(value_name)
+      # })
       observeEvent(data_tot(), {
-        value_name = paste0('data_dcr_', format(Sys.time(), "%Y%m%d%H%M"))
-        DataCraftR:::modaldialog_dcr(value_name, input, output)
-        name_save(value_name)
+        DataCraftR:::save_data_dcr(data_tot(), "scatter")
+        data_tot(NULL)
+        stopApp()
       })
+      
     })
     
     # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -217,41 +229,22 @@ scatter_dcr <- function() {
       data_tot(data)
     })
     
-    observeEvent(input$save_id, {
-      var_name = input$var_name_id
-      
-      cat('variable: \"', var_name, '\" to environment\n')
-      assign(var_name, data_tot(), envir = .GlobalEnv)
-      removeModal()
-      
-      # if(exists(var_name) & (name_save() != var_name)){
-      #   DataCraftR:::modaldialog_dcr(var_name)
-      # } 
-      # else {
-      #   cat('variable: ', var_name, ' to environment\n')
-      #   assign(var_name, data_tot(), envir = .GlobalEnv)
-      #   removeModal()
-      # }
-      # name_save(var_name)
-    })
-    
-    # observe({
-    #   req(input$var_name_id)
-    #   
+    # observeEvent(input$save_id, {
     #   var_name = input$var_name_id
     #   
-    #   output$conf_name_id <- renderPrint({
-    #     if(var_name %in% names(.GlobalEnv)){
-    #       tags$h4(
-    #         tags$i(input$var_name_id),
-    #         ' already exist in your environment',
-    #         tags$b('Do you want to overwirte?')
-    #       )
-    #     } else {
-    #       tags$h4('')
-    #     }
-    #   })
+    #   cat('variable: \"', var_name, '\" to environment\n')
+    #   assign(var_name, data_tot(), envir = .GlobalEnv)
+    #   removeModal()
     #   
+    #   # if(exists(var_name) & (name_save() != var_name)){
+    #   #   DataCraftR:::modaldialog_dcr(var_name)
+    #   # } 
+    #   # else {
+    #   #   cat('variable: ', var_name, ' to environment\n')
+    #   #   assign(var_name, data_tot(), envir = .GlobalEnv)
+    #   #   removeModal()
+    #   # }
+    #   # name_save(var_name)
     # })
     
     # # # # # # # # # # # # # # # # # # # # # # # # # # #

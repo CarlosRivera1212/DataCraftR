@@ -18,7 +18,7 @@ Authors@R: c(
   )
 Description: Shiny-based addins to create datasets interactively through graphical 
     interfaces. Users can adjust plot elements to set parameters for data 
-    generation, and the resulting datasets are returned to the R environment 
+    generation, and the resulting datasets are returned to RDS temporal files 
     for analysis or visualization.
 License: GPL (>= 3)
 URL: https://github.com/CarlosRivera1212/DataCraftR

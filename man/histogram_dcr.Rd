@@ -7,13 +7,13 @@
 histogram_dcr()
 }
 \value{
-Invisibly returns NULL. The main purpose is to launch the interactive gadget.
-Generated data is assigned to the global environment via the "Data to environment" button as `data_hist_dcr`.
+A Shiny gadget interface is launched.\
+The generated data are saved into temporal rds file
 }
 \description{
 Launches an interactive Shiny gadget to generate synthetic data using histograms.
 Users can interactively set bin counts, Y-axis limits, and select variables for visualization.
-Generated data can be exported to the R environment.
+The resulting dataset can be exported to rds file with one click.
 }
 \details{
 Histogram Addin for Interactive Data Generation

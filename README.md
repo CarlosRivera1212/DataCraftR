@@ -3,7 +3,7 @@
 **DataCraftR** is an R package that provides a set of interactive tools for **data generation through visualization**.  
 Each tool is implemented as a **Shiny addin** integrating **D3.js** for real-time, graphical data creation.  
 
-> **Inspried on**: [drawdata.xyz](https://drawdata.xyz/)  
+> **Inspried on**: [drawdata.xyz](https://github.com/koaning/drawdata)
 > **Powered by**: [Shiny](https://shiny.posit.co/) and [D3](https://d3js.org/)
 
 ---
@@ -21,7 +21,7 @@ This package is ideal for teaching, demonstrations, or prototyping datasets base
 - :takeout_box: Interactive **Boxplot**: drag quantiles to define distributions.
 - :bar_chart: Interactive **Histogram**: draw bar heights to define data frequency.
 - :white_circle: Interactive **Scatter **: paint clusters or point groups directly. 
-- :floppy_disk: One-click export of generated data to your R environment.
+- :floppy_disk: One-click export of generated data to RDS temporal file.
 - :brain: Designed as RStudio **Addins** for quick access.
 - :gear:️ Built with **Shiny** and **D3.js** for modern, responsive UI.
 
@@ -54,7 +54,7 @@ DataCraftR::scatter_dcr()
 ```
 
 Each tool opens a Shiny gadget with an interactive D3.js visualization.  
-The generated data can be exported to your global environment by clicking **“Data to environment”**.
+The generated data can be exported to temporal RDS file by clicking **“Save Data”**.
 
 ---
 

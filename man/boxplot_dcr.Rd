@@ -7,12 +7,13 @@
 boxplot_dcr()
 }
 \value{
-Invisibly returns NULL. The main purpose is to launch the interactive gadget.
-Generated data can be assigned to the global environment via the "Data to environment" button.
+A Shiny gadget interface is launched.\
+The generated data are saved into temporal rds file
 }
 \description{
 Launches an interactive Shiny gadget to generate synthetic data using either normal or uniform distributions.
-Users can drag boxplots to define distribution parameters and export the generated data to the R environment.
+Users can drag boxplots to define distribution parameters.
+The resulting dataset can be exported to rds file with one click.
 }
 \details{
 Boxplot Addin for Interactive Data Generation
@@ -21,7 +22,7 @@ Boxplot Addin for Interactive Data Generation
 This gadget integrates Shiny and D3.js for interactive visualization.
 Users can adjust the number of variables, sample size, and distribution type.
 Additional options allow setting initial Y-axis limits and a random seed.
-The generated data can be exported to the global environment with a single click.
+The resulting dataset can be exported to rds file with one click.
 
 The D3.js code handles the boxplot drawing and interaction, while Shiny manages user inputs and server-side data generation.
 }
@@ -31,6 +32,10 @@ The D3.js code handles the boxplot drawing and interaction, while Shiny manages 
 DataCraftR::boxplot_dcr()
 }
 
+}
+\seealso{
+Other DataCraftR generation tools:
+\code{\link{scatter_dcr}}, \code{\link{histogram_dcr}}, \code{\link{count_dcr}}
 }
 \author{
 Carlos Rivera

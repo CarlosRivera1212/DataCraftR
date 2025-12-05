@@ -67,7 +67,7 @@ ui <- fluidPage(
         
         input_task_button(
           'data_id',
-          label = 'Data to environment',
+          label = 'Save Data',
           icon = bs_icon('code-slash'),
           type = 'success',
         ),
@@ -173,8 +173,8 @@ server <- function(input, output, session) {
   observeEvent(input$save_id, {
     var_name = input$var_name_id
 
-    cat('variable: \"', var_name, '\" to environment\n')
-    assign(var_name, data_tot(), envir = .GlobalEnv)
+    # cat('variable: \"', var_name, '\" to environment\n')
+    # assign(var_name, data_tot(), envir = .GlobalEnv)
     removeModal()
   })
 

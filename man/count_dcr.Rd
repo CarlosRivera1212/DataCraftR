@@ -6,6 +6,45 @@
 \usage{
 count_dcr()
 }
+\value{
+A Shiny gadget interface is launched.\
+The generated data are saved into temporal rds file
+}
 \description{
+Opens an interactive Shiny gadget that allows users to visually generate
+**count-based categorical data** by adjusting bar heights in a D3.js bar plot.
+
+Users can control the number of variables, number of categories per variable,
+and the maximum count value for the bars. 
+The resulting dataset can be exported to rds file with one click.
+
+This tool is designed to support data simulation for teaching, demos, and
+prototyping of discrete categorical count structures.
+}
+\details{
 Count Addin for Interactive Count Data Generation
+
+
+**JavaScript integration** (via `count.js`) is used to capture user interactions,
+dynamically update counts, and return the generated data to R.
+
+Data are returned as a data frame with two factors:
+\itemize{
+  \item \code{var}: Variable identity (e.g. V1, V2, ...)
+  \item \code{cat}: Category identity (e.g. C1, C2, ...)
+}
+}
+\examples{
+\dontrun{
+# Launch the interactive count generator
+DataCraftR::count_dcr()
+}
+
+}
+\seealso{
+Other DataCraftR generation tools:
+\code{\link{boxplot_dcr}}, \code{\link{histogram_dcr}}, \code{\link{scatter_dcr}}
+}
+\author{
+Carlos Rivera
 }

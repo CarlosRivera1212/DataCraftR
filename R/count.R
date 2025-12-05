@@ -1,7 +1,48 @@
 #' Count Addin for Interactive Count Data Generation
 #'
 #' @title Count Bar Plot Data Generator
+#'
+#' @description
+#' Opens an interactive Shiny gadget that allows users to visually generate
+#' **count-based categorical data** by adjusting bar heights in a D3.js bar plot.
+#'
+#' Users can control the number of variables, number of categories per variable,
+#' and the maximum count value for the bars. 
+#' The resulting dataset can be exported to rds file with one click.
+#'
+#' This tool is designed to support data simulation for teaching, demos, and
+#' prototyping of discrete categorical count structures.
+#'
+#' @details
+#' **JavaScript integration** (via `count.js`) is used to capture user interactions,
+#' dynamically update counts, and return the generated data to R.
+#'
+#' Data are returned as a data frame with two factors:
+#' \itemize{
+#'   \item \code{var}: Variable identity (e.g. V1, V2, ...)
+#'   \item \code{cat}: Category identity (e.g. C1, C2, ...)
+#' }
+#'
+#' @return
+#' A Shiny gadget interface is launched.\
+#' The generated data are saved into temporal rds file
+#'
+#' @examples
+#' \dontrun{
+#' # Launch the interactive count generator
+#' DataCraftR::count_dcr()
+#' }
+#'
+#' @author Carlos Rivera
 #' 
+#' @import shiny
+#' @import bslib
+#' @import shinyWidgets
+#' @importFrom bsicons bs_icon
+#'
+#' @seealso
+#' Other DataCraftR generation tools:
+#' \code{\link{boxplot_dcr}}, \code{\link{histogram_dcr}}, \code{\link{scatter_dcr}}
 #' @export
 
 count_dcr <- function(){
@@ -52,20 +93,20 @@ count_dcr <- function(){
         layout_column_wrap(
           width = 1,
           fill = T,
-          # input_task_button('reset_id', 'Resest all', icon = bs_icon('bootstrap-reboot')),
-          # input_task_button('alup_id', 'Top aligment', icon = bs_icon('align-top')),
-          # input_task_button('aldw_id', 'Bottom aligment', icon = bs_icon('align-bottom')),
-          layout_column_wrap(
-            width = 1 / 3,
-            fill = T,
-            input_task_button('down_id', 'Down', icon = bs_icon('align-bottom'), label_busy = ''),
-            input_task_button('mid_id', 'Middle', icon = bs_icon('align-middle'), label_busy = ''),
-            input_task_button('up_id', 'Up', icon = bs_icon('align-top'), label_busy = '')
-          ),
+          input_task_button('reset_id', 'Resest all', icon = bs_icon('bootstrap-reboot')),
+          input_task_button('alup_id', 'Top aligment', icon = bs_icon('align-top')),
+          input_task_button('aldw_id', 'Bottom aligment', icon = bs_icon('align-bottom')),
+          # layout_column_wrap(
+          #   width = 1 / 3,
+          #   fill = T,
+          #   input_task_button('down_id', 'Down', icon = bs_icon('align-bottom'), label_busy = ''),
+          #   input_task_button('mid_id', 'Middle', icon = bs_icon('align-middle'), label_busy = ''),
+          #   input_task_button('up_id', 'Up', icon = bs_icon('align-top'), label_busy = '')
+          # ),
           
           input_task_button(
             'data_id',
-            label = 'Data to environment',
+            label = 'Save Data',
             icon = bs_icon('code-slash'),
             type = 'success',
           ),
@@ -144,9 +185,9 @@ count_dcr <- function(){
       session$sendCustomMessage("data_click", NA)
       
       observeEvent(data_tot(), {
-        value_name = paste0('data_dcr_', format(Sys.time(), "%Y%m%d%H%M"))
-        DataCraftR:::modaldialog_dcr(value_name, input, output)
-        name_save(value_name)
+        DataCraftR:::save_data_dcr(data_tot(), "count")
+        data_tot(NULL)
+        # stopApp()
       })
     })
     
@@ -160,22 +201,16 @@ count_dcr <- function(){
       var_names = paste0('V', 1:input$nvar_id)
       cat_names = paste0('C', 1:input$ncat_id)
       
+      pre_var = rep(var_names, colSums(m_count))
+      pre_cat = apply(m_count, 2, function(x){rep(cat_names, x)})
+      
       data = data.frame(
-        var = rep(var_names, colSums(m_count)),
-        cat = rep(rep(cat_names, input$nvar_id), m_count)
+        var = factor(pre_var, levels = var_names, ordered = T),
+        cat = factor(unlist(pre_cat), levels = cat_names, ordered = T)
       )
       
       data_tot(data)
     })
-    
-    observeEvent(input$save_id, {
-      var_name = input$var_name_id
-      
-      cat('variable: \"', var_name, '\" to environment\n')
-      assign(var_name, data_tot(), envir = .GlobalEnv)
-      removeModal()
-    })
-    
     
     # # # # # # # # # # # # # # # # # # # # # # # # # # #
     # Close ----
@@ -186,6 +221,6 @@ count_dcr <- function(){
   }
   
   # viewer = paneViewer(750)
-  viewer = dialogViewer('Scatter DataCraftR', 950, 705)
+  viewer = dialogViewer('Count DataCraftR', 950, 705)
   runGadget(ui, server, viewer = viewer)
 }

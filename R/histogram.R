@@ -4,7 +4,7 @@
 #' @description
 #' Launches an interactive Shiny gadget to generate synthetic data using histograms.
 #' Users can interactively set bin counts, Y-axis limits, and select variables for visualization.
-#' Generated data can be exported to the R environment.
+#' The resulting dataset can be exported to rds file with one click.
 #'
 #' @details
 #' This gadget integrates Shiny and D3.js for dynamic histogram generation and visualization.
@@ -21,8 +21,8 @@
 #' The D3.js code handles the histogram drawing and interaction, while Shiny manages inputs and server-side data processing.
 #'
 #' @return
-#' Invisibly returns NULL. The main purpose is to launch the interactive gadget.
-#' Generated data is assigned to the global environment via the "Data to environment" button as `data_hist_dcr`.
+#' A Shiny gadget interface is launched.\
+#' The generated data are saved into temporal rds file
 #'
 #' @examples
 #' \dontrun{
@@ -94,7 +94,7 @@ histogram_dcr <- function() {
           
           input_task_button(
             'h_data_id',
-            label = 'Data to environment',
+            label = 'Save Data',
             icon = bs_icon('code-slash'),
             type = 'success',
           ),
@@ -125,7 +125,7 @@ histogram_dcr <- function() {
               step = 1,
               width = '100%'
             ),
-            textInput('b_seed_id', label = 'Set seed', placeholder = 123)
+            textInput('h_seed_id', label = 'Set seed', placeholder = 123)
             
           ),
           input_task_button(
@@ -155,6 +155,7 @@ histogram_dcr <- function() {
   server <- function(input, output, session) {
     params = reactiveVal()
     data_tot = reactiveVal()
+    data_par = reactiveVal()
     
     observeEvent(input$h_nv_id, {
       updateRadioGroupButtons(session, 'h_var_id', choices = grp[seq(input$h_nv_id)])
@@ -217,8 +218,8 @@ histogram_dcr <- function() {
       session$sendCustomMessage('data_click', list())
       
       observeEvent(data_tot(), {
-        assign('data_hist_dcr', data_tot(), envir = .GlobalEnv)
-        rstudioapi::sendToConsole('data_hist_dcr', execute = F)
+        DataCraftR:::save_data_dcr(data_tot(), "hist", data_par())
+        data_tot(NULL)
         stopApp()
       })
     })
@@ -234,28 +235,48 @@ histogram_dcr <- function() {
       nv = input$h_nv_id
       xmn = input$h_xmn_id
       xmx = input$h_xmx_id
+      ymx = input$h_ymx_id
       nb = input$h_nbin_id
       
       stp = (xmx-xmn)/nb
-      li = seq(xmn, xmx-stp, stp)
-      ls = seq(xmn+stp, xmx, stp)
+      # li = seq(xmn, xmx-stp, stp)
+      # ls = seq(xmn+stp, xmx, stp)
       
-      data = list()
-      for (i in seq(nv)) {
-        x_i = mapply(function(h, a, b) {
-          stats::runif(h, a, b)
-        }, h = h_js[[i]], a = li, b = ls)
-        
-        data[[paste0('V', i)]] = unlist(x_i)
+      if (nchar(input$h_seed_id) > 0) {
+        set.seed(as.numeric(input$h_seed_id))
       }
       
-      data_tot(data)
+      data = list()
+      
+      for (i in seq(nv)) {
+        h = h_js[[i]]
+        cent = stp * which(h>0)
+        
+        if(any(h!=0)){
+          # x_i = mapply(function(h, a, b) {
+          #   stats::runif(h, a, b)
+          # }, h = h_js[[i]], a = li, b = ls)
+          # 
+          # data[[paste0('V', i)]] = unlist(x_i)
+          
+          x_i = mapply(function(h, c) {
+            stats::runif(h, c-stp, c)
+          }, h = h[h>0], c = cent, SIMPLIFY = F)
+          data[[paste0('V', i)]] = unlist(x_i)
+        }
+      }
+      
+      if(length(data)>0){
+        data_tot(data)
+        # data_par(c(stp, xmn, xmx, ymx))
+        data_par(c(nb, xmn, xmx, ymx))
+      }
     })
     
     # # # # # # # # # # # # # # # # # # # # # # # # # # #
     # Close ----
     observeEvent(input$done, {
-      cat(date(), '\n')
+      # cat(date(), '\n')
       stopApp()
     })
   }

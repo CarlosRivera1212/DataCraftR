@@ -7,12 +7,13 @@
 scatter_dcr()
 }
 \value{
-Invisibly returns NULL. The main purpose is to launch the interactive gadget.
-Generated data is available in the `data_tot` reactive and printed as a tibble in the Shiny gadget.
+A Shiny gadget interface is launched.\
+The generated data are saved into temporal rds file
 }
 \description{
 Launches an interactive Shiny gadget to generate synthetic data by drawing points on a scatter plot.
-Users can control the number of groups, brush size, and axis limits, and export the generated data to the R environment.
+Users can control the number of groups, brush size, and axis limits.
+The resulting dataset can be exported to rds file with one click.
 }
 \details{
 Scatter Plot Addin for Interactive Data Generation
@@ -35,6 +36,10 @@ The D3.js code handles drawing and interactivity, while Shiny manages user input
 DataCraftR::scatter_dcr()
 }
 
+}
+\seealso{
+Other DataCraftR generation tools:
+\code{\link{boxplot_dcr}}, \code{\link{histogram_dcr}}, \code{\link{count_dcr}}
 }
 \author{
 Carlos Rivera

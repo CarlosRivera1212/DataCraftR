@@ -3,19 +3,20 @@
 #' @title Boxplot Data Generator
 #' @description
 #' Launches an interactive Shiny gadget to generate synthetic data using either normal or uniform distributions.
-#' Users can drag boxplots to define distribution parameters and export the generated data to the R environment.
+#' Users can drag boxplots to define distribution parameters.
+#' The resulting dataset can be exported to rds file with one click.
 #'
 #' @details
 #' This gadget integrates Shiny and D3.js for interactive visualization.
 #' Users can adjust the number of variables, sample size, and distribution type.
 #' Additional options allow setting initial Y-axis limits and a random seed.
-#' The generated data can be exported to the global environment with a single click.
+#' The resulting dataset can be exported to rds file with one click.
 #'
 #' The D3.js code handles the boxplot drawing and interaction, while Shiny manages user inputs and server-side data generation.
 #'
 #' @return
-#' Invisibly returns NULL. The main purpose is to launch the interactive gadget.
-#' Generated data can be assigned to the global environment via the "Data to environment" button.
+#' A Shiny gadget interface is launched.\
+#' The generated data are saved into temporal rds file
 #'
 #' @examples
 #' \dontrun{
@@ -24,12 +25,18 @@
 #' }
 #'
 #' @author Carlos Rivera
+#' 
 #' @import shiny
 #' @import bslib
 #' @import shinyWidgets
 #' @importFrom bsicons bs_icon
 #' @importFrom rstudioapi sendToConsole insertText
+#'
+#' @seealso
+#' Other DataCraftR generation tools:
+#' \code{\link{scatter_dcr}}, \code{\link{histogram_dcr}}, \code{\link{count_dcr}}
 #' @export
+
 
 boxplot_dcr <- function() {
   dcr_col <- DataCraftR:::palette()
@@ -86,7 +93,7 @@ boxplot_dcr <- function() {
           input_task_button("b_realign_id", "Align middle", icon = bs_icon("align-middle")),
           input_task_button(
             "b_data_id",
-            "Data to environment",
+            "Save Data",
             icon = bs_icon("code-slash"),
             type = "success",
           ),
@@ -165,19 +172,11 @@ boxplot_dcr <- function() {
       session$sendCustomMessage("data_click", list())
 
       observeEvent(data_tot(), {
-        assign("data", data_tot(), envir = .GlobalEnv)
+        DataCraftR:::save_data_dcr(data_tot(), "box")
+        data_tot(NULL)
+        stopApp()
       })
     })
-
-
-    # observeEvent(input$b_data2_id, {
-    #   session$sendCustomMessage('data_click', list())
-    #
-    #
-    #   output$print_id <- renderPrint({
-    #     tidyr::tibble(data_tot())
-    #   })
-    # })
 
     # # # # # # # # # # # # # # # # # # # # # # # # # # #
     # Return Data ----
