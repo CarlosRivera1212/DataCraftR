@@ -82,7 +82,7 @@ The generated data can be exported to temporal RDS file by clicking **“Save Da
 ## :man_technologist: Author
 
 **Carlos Rivera**
-:email: [caariveramo@unal.edu.co](caariveramo@unal.edu.co)
+:email: [riveramo.carlos@gmail.com](riveramo.carlos@gmail.com)
 
 ---
 
@@ -98,7 +98,7 @@ See the `LICENSE` file for more details.
 If you use this package in academic work, please cite it as:
 
 > Rivera, C. (2025). *DataCraftR: Interactive Data Generation Tools with Shiny and D3.js.*
-> GitHub repository: [https://https://github.com/CarlosRivera1212/DataCraftR](https://https://github.com/CarlosRivera1212/DataCraftR)
+> GitHub repository: [https://github.com/CarlosRivera1212/DataCraftR](https://github.com/CarlosRivera1212/DataCraftR)
 
 ---
 
