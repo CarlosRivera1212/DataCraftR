@@ -7,7 +7,7 @@ library(tidyr)
 
 options(shiny.autoreload = TRUE)
 
-dcr_col = DataCraftR:::palette()
+dcr_col = palette()
 addResourcePath("assets", system.file("assets", package = "DataCraftR"))
 
 ui <- fluidPage(
@@ -147,7 +147,7 @@ server <- function(input, output, session) {
 
     observeEvent(data_tot(), {
       value_name = paste0('data_dcr_', format(Sys.time(), "%Y%m%d%H%M"))
-      DataCraftR:::modaldialog_dcr(value_name, input, output)
+      modaldialog_dcr(value_name, input, output)
       name_save(value_name)
     })
   })

@@ -43,7 +43,8 @@
 
 scatter_dcr <- function() {
   grp = stats::setNames(paste0('G', seq(10)), paste0('G', seq(10)))
-  dcr_col = DataCraftR:::palette()
+  # dcr_col = DataCraftR:::palette()
+  dcr_col = palette()
   addResourcePath("assets", system.file("assets", package = "DataCraftR"))
   
   ui <- fluidPage(
@@ -204,11 +205,11 @@ scatter_dcr <- function() {
       
       # observeEvent(data_tot(), {
       #   value_name = paste0('data_dcr_', format(Sys.time(), "%Y%m%d%H%M"))
-      #   DataCraftR:::modaldialog_dcr(value_name, input, output)
+      #   modaldialog_dcr(value_name, input, output)
       #   name_save(value_name)
       # })
       observeEvent(data_tot(), {
-        DataCraftR:::save_data_dcr(data_tot(), "scatter")
+        save_data_dcr(data_tot(), "scatter")
         data_tot(NULL)
         stopApp()
       })
@@ -237,7 +238,7 @@ scatter_dcr <- function() {
     #   removeModal()
     #   
     #   # if(exists(var_name) & (name_save() != var_name)){
-    #   #   DataCraftR:::modaldialog_dcr(var_name)
+    #   #   modaldialog_dcr(var_name)
     #   # } 
     #   # else {
     #   #   cat('variable: ', var_name, ' to environment\n')

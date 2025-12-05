@@ -39,8 +39,8 @@
 
 
 boxplot_dcr <- function() {
-  dcr_col <- DataCraftR:::palette()
-  dcr_col_bg <- DataCraftR:::palette(lf = 25)
+  dcr_col <- palette()
+  dcr_col_bg <- palette(lf = 25)
   addResourcePath("assets", system.file("assets", package = "DataCraftR"))
 
   ui <- fluidPage(
@@ -172,7 +172,7 @@ boxplot_dcr <- function() {
       session$sendCustomMessage("data_click", list())
 
       observeEvent(data_tot(), {
-        DataCraftR:::save_data_dcr(data_tot(), "box")
+        save_data_dcr(data_tot(), "box")
         data_tot(NULL)
         stopApp()
       })

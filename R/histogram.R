@@ -40,7 +40,7 @@
 
 histogram_dcr <- function() {
   grp = paste0('V', seq(10))
-  dcr_col = DataCraftR:::palette()
+  dcr_col = palette()
   addResourcePath("assets", system.file("assets", package = "DataCraftR"))
   
   ui <- fluidPage(
@@ -218,7 +218,7 @@ histogram_dcr <- function() {
       session$sendCustomMessage('data_click', list())
       
       observeEvent(data_tot(), {
-        DataCraftR:::save_data_dcr(data_tot(), "hist", data_par())
+        save_data_dcr(data_tot(), "hist", data_par())
         data_tot(NULL)
         stopApp()
       })

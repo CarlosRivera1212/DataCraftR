@@ -46,7 +46,7 @@
 #' @export
 
 count_dcr <- function(){
-  dcr_col = DataCraftR:::palette()
+  dcr_col = palette()
   addResourcePath("assets", system.file("assets", package = "DataCraftR"))
   
   ui <- fluidPage(
@@ -185,7 +185,7 @@ count_dcr <- function(){
       session$sendCustomMessage("data_click", NA)
       
       observeEvent(data_tot(), {
-        DataCraftR:::save_data_dcr(data_tot(), "count")
+        save_data_dcr(data_tot(), "count")
         data_tot(NULL)
         # stopApp()
       })
