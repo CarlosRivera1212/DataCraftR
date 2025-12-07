@@ -82,7 +82,6 @@ The generated data can be exported to temporal RDS file by clicking **“Save Da
 ## :man_technologist: Author
 
 **Carlos Rivera**
-:email: [riveramo.carlos@gmail.com](riveramo.carlos@gmail.com)
 
 ---
 
