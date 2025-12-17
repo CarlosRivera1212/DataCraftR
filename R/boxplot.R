@@ -19,9 +19,9 @@
 #' The generated data are saved into temporal rds file
 #'
 #' @examples
-#' \dontrun{
+#' if (interactive()) {
 #' # Launch the interactive Boxplot addin
-#' DataCraftR::boxplot_dcr()
+#' boxplot_dcr()
 #' }
 #'
 #' @author Carlos Rivera

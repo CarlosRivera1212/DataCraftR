@@ -35,9 +35,9 @@ Data are returned as a data frame with two factors:
 }
 }
 \examples{
-\dontrun{
+if (interactive()) {
 # Launch the interactive count generator
-DataCraftR::count_dcr()
+count_dcr()
 }
 
 }

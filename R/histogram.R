@@ -25,9 +25,9 @@
 #' The generated data are saved into temporal rds file
 #'
 #' @examples
-#' \dontrun{
+#' if (interactive()) {
 #' # Launch the interactive Histogram addin
-#' DataCraftR::histogram_dcr()
+#' histogram_dcr()
 #' }
 #'
 #' @author Carlos Rivera

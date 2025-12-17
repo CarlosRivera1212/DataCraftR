@@ -28,9 +28,9 @@
 #' The generated data are saved into temporal rds file
 #'
 #' @examples
-#' \dontrun{
+#' if (interactive()) {
 #' # Launch the interactive count generator
-#' DataCraftR::count_dcr()
+#' count_dcr()
 #' }
 #'
 #' @author Carlos Rivera

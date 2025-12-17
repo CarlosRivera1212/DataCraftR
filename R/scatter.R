@@ -23,9 +23,9 @@
 #' The generated data are saved into temporal rds file
 #'
 #' @examples
-#' \dontrun{
+#' if (interactive()) {
 #' # Launch the interactive Scatter addin
-#' DataCraftR::scatter_dcr()
+#' scatter_dcr()
 #' }
 #'
 #' @author Carlos Rivera

@@ -27,9 +27,9 @@ The resulting dataset can be exported to rds file with one click.
 The D3.js code handles the boxplot drawing and interaction, while Shiny manages user inputs and server-side data generation.
 }
 \examples{
-\dontrun{
+if (interactive()) {
 # Launch the interactive Boxplot addin
-DataCraftR::boxplot_dcr()
+boxplot_dcr()
 }
 
 }
