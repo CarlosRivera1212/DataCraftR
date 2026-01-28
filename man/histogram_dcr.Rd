@@ -32,13 +32,6 @@ and exporting the generated data.
 
 The D3.js code handles the histogram drawing and interaction, while Shiny manages inputs and server-side data processing.
 }
-\examples{
-if (interactive()) {
-# Launch the interactive Histogram addin
-histogram_dcr()
-}
-
-}
 \author{
 Carlos Rivera
 }

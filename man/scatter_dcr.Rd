@@ -30,13 +30,6 @@ Interactive buttons allow resetting the plot, undoing/redoing actions, and expor
 
 The D3.js code handles drawing and interactivity, while Shiny manages user inputs and server-side data handling.
 }
-\examples{
-if (interactive()) {
-# Launch the interactive Scatter addin
-scatter_dcr()
-}
-
-}
 \seealso{
 Other DataCraftR generation tools:
 \code{\link{boxplot_dcr}}, \code{\link{histogram_dcr}}, \code{\link{count_dcr}}

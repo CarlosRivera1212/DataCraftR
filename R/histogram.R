@@ -24,12 +24,6 @@
 #' A Shiny gadget interface is launched.\
 #' The generated data are saved into temporal rds file
 #'
-#' @examples
-#' if (interactive()) {
-#' # Launch the interactive Histogram addin
-#' histogram_dcr()
-#' }
-#'
 #' @author Carlos Rivera
 #' @import shiny
 #' @import bslib

@@ -27,12 +27,6 @@
 #' A Shiny gadget interface is launched.\
 #' The generated data are saved into temporal rds file
 #'
-#' @examples
-#' if (interactive()) {
-#' # Launch the interactive count generator
-#' count_dcr()
-#' }
-#'
 #' @author Carlos Rivera
 #' 
 #' @import shiny
@@ -169,15 +163,15 @@ count_dcr <- function(){
       session$sendCustomMessage('update_y', input$ymx_id)
     })
     
-    observeEvent(input$down_id, {
-      session$sendCustomMessage('align', 'down')
-    })
-    
-    observeEvent(input$mid_id, {
+    observeEvent(input$reset_id, {
       session$sendCustomMessage('align', 'mid')
     })
     
-    observeEvent(input$up_id, {
+    observeEvent(input$aldw_id, {
+      session$sendCustomMessage('align', 'down')
+    })
+    
+    observeEvent(input$alup_id, {
       session$sendCustomMessage('align', 'up')
     })
     

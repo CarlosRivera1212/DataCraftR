@@ -22,12 +22,6 @@
 #' A Shiny gadget interface is launched.\
 #' The generated data are saved into temporal rds file
 #'
-#' @examples
-#' if (interactive()) {
-#' # Launch the interactive Scatter addin
-#' scatter_dcr()
-#' }
-#'
 #' @author Carlos Rivera
 #' 
 #' @import shiny

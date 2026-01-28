@@ -81,10 +81,11 @@ boxplot(data_dcr_box)
 table(data_dcr_count)
 barplot(table(data_dcr_count), beside = T)
 
-ggplot(data_dcr_count)+
-  aes(cat, fill=var)+
-  geom_bar(position = 'dodge')+
-  theme_bw()
+# library(ggplot2)
+# ggplot(data_dcr_count)+
+#   aes(cat, fill=var)+
+#   geom_bar(position = 'dodge')+
+#   theme_bw()
 "
     )
   }
