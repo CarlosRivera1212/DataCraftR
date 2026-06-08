@@ -34,6 +34,12 @@ Data are returned as a data frame with two factors:
   \item \code{cat}: Category identity (e.g. C1, C2, ...)
 }
 }
+\examples{
+if(interactive()){
+  count_dcr()
+}
+
+}
 \seealso{
 Other DataCraftR generation tools:
 \code{\link{boxplot_dcr}}, \code{\link{histogram_dcr}}, \code{\link{scatter_dcr}}

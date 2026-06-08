@@ -25,11 +25,16 @@
 #' @author Carlos Rivera
 #' 
 #' @import shiny
-#' @import bslib
-#' @import shinyWidgets
+#' @importFrom shinyWidgets radioGroupButtons updateRadioGroupButtons dropdown
+#' @importFrom bslib layout_column_wrap input_task_button
 #' @importFrom bsicons bs_icon
 #' @importFrom rstudioapi sendToConsole insertText
 #'
+#' @examples
+#' if(interactive()){
+#'   scatter_dcr()
+#' }
+#' 
 #' @seealso
 #' Other DataCraftR generation tools:
 #' \code{\link{boxplot_dcr}}, \code{\link{histogram_dcr}}, \code{\link{count_dcr}}
@@ -39,7 +44,6 @@ scatter_dcr <- function() {
   grp = stats::setNames(paste0('G', seq(10)), paste0('G', seq(10)))
   # dcr_col = DataCraftR:::palette()
   dcr_col = palette()
-  addResourcePath("assets", system.file("assets", package = "DataCraftR"))
   
   ui <- fluidPage(
     # titlePanel('Scatter - '),
@@ -77,26 +81,26 @@ scatter_dcr <- function() {
           layout_column_wrap(
             width = 1 / 3,
             fill = T,
-            input_task_button('s_reset_id', icon('trash-can'), label_busy = ''),
-            input_task_button('s_undo_id', icon('rotate-left'), label_busy = ''),
-            input_task_button('s_redo_id', icon('rotate-right'), label_busy = '')
-            # input_task_button('s_reset_id', bs_icon('trash3'), label_busy = ''),
-            # input_task_button('s_undo_id', bs_icon('arrow-counterclockwise'), label_busy = ''),
-            # input_task_button('s_redo_id', bs_icon('arrow-clockwise'), label_busy = '')
+            # input_task_button('s_reset_id', icon('trash-can'), label_busy = ''),
+            # input_task_button('s_undo_id', icon('rotate-left'), label_busy = ''),
+            # input_task_button('s_redo_id', icon('rotate-right'), label_busy = '')
+            input_task_button('s_reset_id', bs_icon('trash3'), label_busy = ''),
+            input_task_button('s_undo_id', bs_icon('arrow-counterclockwise'), label_busy = ''),
+            input_task_button('s_redo_id', bs_icon('arrow-clockwise'), label_busy = '')
           ),
           input_task_button(
             's_data_id',
             label = 'Save Data',
-            icon = icon('code'),
-            # icon = bs_icon('code-slash'),
+            # icon = icon('code'),
+            icon = bs_icon('code-slash'),
             type = 'success',
           ),
         ),
         
         tags$br(),
         dropdown(
-          # label = tags$html(bs_icon('gear')),
-          label = icon('gear'),
+          # label = icon('gear'),
+          label = tags$html(bs_icon('gear')),
           width = '100%',
           sliderInput(
             's_ngrp_id',
@@ -114,9 +118,9 @@ scatter_dcr <- function() {
         
         tags$div(class = 'cards-container', uiOutput('s_txt_id')),
 
-        # input_task_button('done', 'Close', icon = bs_icon('x-square'), type = 'danger'),
         # input_task_button('done', 'Close', icon = icon('remove-circle', lib = 'glyphicon'), type = 'danger'),
-        input_task_button('done', 'Close', icon = icon('rectangle-xmark'), type = 'danger'),
+        # input_task_button('done', 'Close', icon = icon('rectangle-xmark'), type = 'danger'),
+        input_task_button('done', 'Close', icon = bs_icon('x-square'), type = 'danger'),
       ),
       
       mainPanel(
@@ -126,8 +130,7 @@ scatter_dcr <- function() {
           height = 700
         ),
         
-        # tags$script(src = "scatter.js")
-        includeScript(system.file("assets/js/scatter.js", package = "DataCraftR"))
+        tags$script(src = "assets/js/scatter.js")
       )
     ))
   
@@ -245,7 +248,7 @@ scatter_dcr <- function() {
     # # # # # # # # # # # # # # # # # # # # # # # # # # #
     # Close ----
     observeEvent(input$done, {
-      cat(date(), '\n')
+      message(date())
       stopApp()
     })
   }
