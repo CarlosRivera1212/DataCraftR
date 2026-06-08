@@ -1,3 +1,6 @@
+#' @noRd
+
+#' @noRd
 modaldialog_dcr <- function(var_name, input, output){
   showModal(modalDialog(
     textInput("var_name_id", "Variable name in the environment", value = var_name),

@@ -1,3 +1,31 @@
+#' Boxplot Addin for Interactive Data Generation
+#'
+#' @title Boxplot Data Generator
+#' 
+#' @description
+#' Launches an interactive Shiny gadget to generate synthetic data using either normal or uniform distributions.
+#' Users can drag boxplots to define distribution parameters.
+#' The resulting dataset can be exported to rds file with one click.
+#'
+#' @details
+#' This gadget integrates Shiny and D3.js for interactive visualization.
+#' Users can adjust the number of variables, sample size, and distribution type.
+#' Additional options allow setting initial Y-axis limits and a random seed.
+#' The resulting dataset can be exported to rds file with one click.
+#'
+#' The D3.js code handles the boxplot drawing and interaction, while Shiny manages user inputs and server-side data generation.
+#'
+#' @return
+#' A Shiny gadget interface is launched.\
+#' The generated data are saved into temporal rds file
+#'
+#' @author Carlos Rivera
+#' 
+#' @examples
+#' palette(n = 5, name = "neon")
+#' palette(n = 5, lf = 0)
+#' 
+#' @noRd
 #' @importFrom RcppColors hsl
 
 # ggthemes::ggthemes_data$calc$colors$value

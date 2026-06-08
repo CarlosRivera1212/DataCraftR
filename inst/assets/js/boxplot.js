@@ -186,26 +186,7 @@ const drag = d3
     update_ax();
   });
 
-function box_init() {
-  box_list.forEach((c) => c.remove());
-  box_list = [];
-
-  for (let i = 0; i < par.nv; i++) {
-    box_list.push(create_box(par.x[i], par.cl[i], par.cb[i]));
-  }
-
-  for (let i = 0; i < box_list.length; i++) {
-    box_list[i].select(".q1").datum({ bi: i, t: ".q1" }).call(drag);
-    box_list[i].select(".q2").datum({ bi: i, t: ".q2" }).call(drag);
-    box_list[i].select(".q3").datum({ bi: i, t: ".q3" }).call(drag);
-
-    update_box(i, 0.4, 0.6);
-  }
-  update_ax();
-}
-
-box_init();
-
+  
 //   //   //   //   //   //   //   //   //
 // FUNCTIONS
 
@@ -272,6 +253,27 @@ function create_box(xc, cl, cb) {
 
   return new_box;
 }
+
+function box_init() {
+  box_list.forEach((c) => c.remove());
+  box_list = [];
+
+  for (let i = 0; i < par.nv; i++) {
+    box_list.push(create_box(par.x[i], par.cl[i], par.cb[i]));
+  }
+
+  for (let i = 0; i < box_list.length; i++) {
+    box_list[i].select(".q1").datum({ bi: i, t: ".q1" }).call(drag);
+    box_list[i].select(".q2").datum({ bi: i, t: ".q2" }).call(drag);
+    box_list[i].select(".q3").datum({ bi: i, t: ".q3" }).call(drag);
+
+    update_box(i, 0.4, 0.6);
+  }
+  update_ax();
+}
+
+box_init();
+
 
 function update_box(bi, q1, q3) {
   const box_i = box_list[bi];

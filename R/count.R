@@ -29,10 +29,16 @@
 #'
 #' @author Carlos Rivera
 #' 
+#' @examples
+#' if(interactive()){
+#'   count_dcr()
+#' }
+#' 
 #' @import shiny
-#' @import bslib
-#' @import shinyWidgets
+#' @importFrom shinyWidgets numericInputIcon dropdown
+#' @importFrom bslib layout_column_wrap input_task_button
 #' @importFrom bsicons bs_icon
+#' @importFrom rstudioapi sendToConsole insertText
 #'
 #' @seealso
 #' Other DataCraftR generation tools:
@@ -41,7 +47,6 @@
 
 count_dcr <- function(){
   dcr_col = palette()
-  addResourcePath("assets", system.file("assets", package = "DataCraftR"))
   
   ui <- fluidPage(
     title = 'Count',
@@ -132,8 +137,7 @@ count_dcr <- function(){
           height = 700
         ),
         
-        # tags$script(src = "count.js")
-        includeScript(system.file("assets/js/count.js", package = "DataCraftR"))
+        tags$script(src = "assets/js/count.js")
       )
     ))
   
@@ -209,7 +213,7 @@ count_dcr <- function(){
     # # # # # # # # # # # # # # # # # # # # # # # # # # #
     # Close ----
     observeEvent(input$done, {
-      cat(date(), '\n')
+      message(date())
       stopApp()
     })
   }

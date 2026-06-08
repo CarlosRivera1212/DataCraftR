@@ -32,6 +32,16 @@ and exporting the generated data.
 
 The D3.js code handles the histogram drawing and interaction, while Shiny manages inputs and server-side data processing.
 }
+\examples{
+if(interactive()){
+  histogram_dcr()
+}
+
+}
+\seealso{
+Other DataCraftR generation tools:
+\code{\link{boxplot_dcr}}, \code{\link{scatter_dcr}}, \code{\link{count_dcr}}
+}
 \author{
 Carlos Rivera
 }

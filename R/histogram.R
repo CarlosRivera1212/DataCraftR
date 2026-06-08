@@ -25,9 +25,19 @@
 #' The generated data are saved into temporal rds file
 #'
 #' @author Carlos Rivera
+#' 
+#' @examples
+#' if(interactive()){
+#'   histogram_dcr()
+#' }
+#' 
+#' @seealso
+#' Other DataCraftR generation tools:
+#' \code{\link{boxplot_dcr}}, \code{\link{scatter_dcr}}, \code{\link{count_dcr}}
+#' 
 #' @import shiny
-#' @import bslib
-#' @import shinyWidgets
+#' @importFrom shinyWidgets radioGroupButtons numericInputIcon dropdown
+#' @importFrom bslib layout_column_wrap input_task_button
 #' @importFrom bsicons bs_icon
 #' @importFrom rstudioapi sendToConsole insertText
 #' @export
@@ -35,7 +45,6 @@
 histogram_dcr <- function() {
   grp = paste0('V', seq(10))
   dcr_col = palette()
-  addResourcePath("assets", system.file("assets", package = "DataCraftR"))
   
   ui <- fluidPage(
     # titlePanel('Histogram - '),
@@ -103,7 +112,7 @@ histogram_dcr <- function() {
               max = 10,
               value = 3,
               step = 1,
-              ticks = F
+              ticks = FALSE
             ),
             numericInputIcon(
               'h_xmn_id',
@@ -140,8 +149,7 @@ histogram_dcr <- function() {
           width = 700,
           height = 700
         ),
-        # tags$script(src = "histogram.js"),
-        includeScript(system.file("assets/js/histogram.js", package = "DataCraftR"))
+        tags$script(src = "assets/js/histogram.js")
       )
     )
   )
@@ -270,7 +278,7 @@ histogram_dcr <- function() {
     # # # # # # # # # # # # # # # # # # # # # # # # # # #
     # Close ----
     observeEvent(input$done, {
-      # cat(date(), '\n')
+      message(date())
       stopApp()
     })
   }

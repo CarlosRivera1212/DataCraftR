@@ -1,0 +1,7 @@
+df1 = data.frame(
+  lote = 1,
+  cama = rep(1:6, each=99),
+  planta = seq(6*99)
+)
+head(df1)
+write.csv(df1, "../jerarquia_lote_1.csv", row.names = F)
