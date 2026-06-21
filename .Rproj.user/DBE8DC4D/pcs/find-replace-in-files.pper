@@ -1,15 +1,15 @@
 {
     "dialog-state": {
-        "query": "show_toast",
+        "query": "density",
         "path": "",
         "regex": false,
         "caseSensitive": false,
         "wholeWord": false,
         "filePatterns": [],
-        "useGitGrep": false,
+        "useGitGrep": true,
         "excludeGitIgnore": true,
         "excludeFilePatterns": [],
-        "resultsCount": 0,
+        "resultsCount": 98,
         "errorCount": 0,
         "replaceErrors": "",
         "projectRelative": true

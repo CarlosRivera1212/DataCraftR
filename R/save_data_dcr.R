@@ -103,6 +103,6 @@ barplot(table(data_dcr_count), beside = T)
   if (rstudioapi::isAvailable()) {
     rstudioapi::insertText(script_txt)
   }
-  # rstudioapi::sendToConsole(file_code, execute = F, animate = T)
-  # rstudioapi::sendToConsole(file_code, execute = T)
+
+  invisible(tmp_file)
 }

@@ -4,3 +4,6 @@
 ^pkgdown$
 ^my_test$
 ^\.Rhistory$
+^\.gitignore$
+^LICENSE
+^papers$
