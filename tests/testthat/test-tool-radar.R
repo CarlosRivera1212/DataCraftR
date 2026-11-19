@@ -12,6 +12,12 @@ test_that("radar_tool() forwards the radar controls", {
                  "integers", "group_name"))
 })
 
+test_that("the radar UI loads its tool script", {
+  html <- htmltools::renderTags(dcr_gadget_ui(radar_tool()))
+  deps <- vapply(html$dependencies, function(d) paste(d$script, collapse = " "), "")
+  expect_true(any(grepl("tools/radar.js", deps, fixed = TRUE)))
+})
+
 test_that("the radar UI has its controls, details and actions", {
   rendered <- htmltools::renderTags(dcr_gadget_ui(radar_tool()))
   html <- rendered$html

@@ -446,6 +446,66 @@ Run `dcr_regression()` (also with `groups = c("A", "B", "C")` for the group step
 - [ ] Done via *Addins > DataCraftR > Regression curve* inserts 3 lines;
       running them (`dcr_load()`) reproduces the same data.
 
+## Radar
+
+Run `dcr_radar()` (also `dcr_radar(c("speed", "power", "agility"), groups = "A")`
+for one group and three variables, and `dcr_radar(range = list(c(0, 10), c(0, 100), c(-1, 1), c(0, 5), c(1, 7)))`).
+
+- [ ] Layout: spokes evenly spaced, first at the top, clockwise; five grid rings
+      with tick labels on the first spoke; each spoke label shows its range.
+      Each group is a coloured polygon (mean) with a shaded band (+- sd); the
+      inactive groups are faint. Sidebar: Groups (names + colour buttons), Edit
+      (Mean | Spread with icons), Variables (names + one min/max row per
+      variable), Spread, Data; every section collapses and expands.
+- [ ] Mean: press a vertex of the active group and drag along its spoke: the
+      value follows the pointer exactly (no jump at the press, also grabbing
+      the vertex off-centre) and stops at the ends of the range. Drag an edge:
+      both ends move. A tooltip shows `variable: mean +- sd`. One drag = one
+      undo step; a click or wiggle under 3 px adds none.
+- [ ] Spread: press the outer or inner square handle and drag: the band grows
+      or shrinks relative to the press (outer: outward grows; inner: inward
+      grows); never below 0 and never above half the range. The band is clipped
+      at the ends of the range.
+- [ ] sd = 0 (Tight, or drag a handle in until the band closes) and back: the
+      two handles sit together; drag outward OR inward from there and the band
+      grows (no jump, never negative); going back past the start leaves 0.
+- [ ] Mean dragged to the end of a range with a wide sd: the tooltip adds
+      `(actual m +- s)` with a smaller mean/sd; after Done the stats table shows
+      those actual values and no value lies outside the range.
+- [ ] Presets Tight / Medium / Wide set the sd of the active group to 5 / 10 /
+      20 % of each variable's range (one undo step each); Same for all groups
+      copies the active group's sds to every group.
+- [ ] Ranges: change a min or max (blur or Enter): that variable's means and sds
+      rescale proportionally (the polygon keeps its shape), one undo step, also
+      to a far range such as 100 to 200. min >= max, blank or text gives a
+      notification and the field goes back to the old value.
+- [ ] Variables: renaming keeps the values; adding one gives it the first
+      variable's range, the mean at the midpoint and sd 10 %; removing one says
+      "X removed - Ctrl+Z to undo"; fewer than 3, more than 12, duplicates or a
+      name equal to the group column name are refused with a message. The
+      min/max rows follow the names (undo and redo too).
+- [ ] Groups: names "A, B, C" give three colours; keys 1-3 (or the buttons, or a
+      click on another polygon) select the group; renaming keeps profiles; a
+      new group starts from its initial profile; removing one says
+      "X removed - Ctrl+Z to undo"; 11 groups are refused. n times groups over
+      1e6 is refused with a message in the canvas and the sidebar goes back.
+- [ ] Integers: ticked, Done returns whole numbers inside each range. Group
+      column name: a name equal to a variable is refused.
+- [ ] Show sample (off by default): thin polylines (at most 300 per group) in
+      the group colours with the label "Preview -- Done draws a new sample";
+      they follow the edits; Resample redraws them. Untick: gone.
+- [ ] Clear restores the initial profiles for the current groups, variables and
+      ranges (names and ranges stay); undo brings the drawing back.
+- [ ] Rapid repeated clicks and drags on vertices, edges and band handles, also
+      letting go outside the chart: it never freezes and a click or a wiggle
+      under 3 px adds no undo step.
+- [ ] Edit then Done: type a new n, a range value or names and click Done
+      without leaving the field; the returned data has them. Done from the
+      console: `dcr_radar()` returns n rows per group with a group factor and
+      one numeric column per variable; with one group and three variables too.
+- [ ] Done via *Addins > DataCraftR > Radar profiles* inserts the usual lines;
+      running them (`dcr_load()`) reproduces the same data.
+
 ## RStudio integration
 
 Run these in RStudio itself (they cannot be checked from the console tests).

@@ -2954,8 +2954,618 @@ for (nm in names(rg_cases)) {
 }
 
 
+# ---- Radar -------------------------------------------------------------------
+# Pure maths (against R values), relative vertex / edge / spread drags, clamps,
+# sd = 0 recovery, presets, ranges, remap, Clear, strokes, Done flush, and
+# toSpec() accepted by R.
+rd_script <- "
+  function mk(o) {
+    var opts = {groups: ['A', 'B'], variables: ['v1', 'v2', 'v3', 'v4', 'v5'],
+                ranges: [[0, 10], [0, 10], [0, 10], [0, 10], [0, 10]], n: 50,
+                mean: [[9, 9, 2, 2, 2], [5, 5, 5, 5, 5]],
+                sd: [[1, 1, 1, 1, 1], [1, 1, 1, 1, 1]]};
+    for (var k in (o || {})) opts[k] = o[k];
+    var t = new DCR.tools.radar({clientWidth: 0, clientHeight: 0,
+      getBoundingClientRect: function () { return {left: 0, top: 0}; }}, opts);
+    t._geo = {W: 200, H: 200, cx: 100, cy: 100, R: 100};
+    t._dom = {svg: {setPointerCapture: function () {}, style: {}}};
+    t.render = function () {};
+    t._draw = function () {};
+    t._flash = function (m) { t.flashed = m; };
+    return t;
+  }
+  function near(a, b, e) { return Math.abs(a - b) < (e || 1e-9); }
+  function drag(t, pts) {            // pts in client px; first one is the press
+    t._pointerDown({button: 0, pointerId: 1, clientX: pts[0][0], clientY: pts[0][1]});
+    pts.slice(1).forEach(function (p) {
+      t._pointerMove({pointerId: 1, clientX: p[0], clientY: p[1]});
+    });
+    t._pointerUp({pointerId: 1});
+  }
+  function along(t, k, d) {          // unit vector of spoke k times d px
+    var a = t._ang(k); return [d * Math.cos(a), d * Math.sin(a)];
+  }
+  function add(a, b) { return [a[0] + b[0], a[1] + b[1]]; }
+  function finite(t) {
+    var s = t.state;
+    return s.mean.every(function (r, g) {
+      return r.every(function (v, j) { return isFinite(v) && v >= s.ranges[j][0] && v <= s.ranges[j][1]; }) &&
+        s.sd[g].every(function (v, j) { return isFinite(v) && v >= 0 && v <= (s.ranges[j][1] - s.ranges[j][0]) / 2; });
+    });
+  }
+"
+run_check("Radar maths", engine("radar"), paste0(rd_script, "
+  (function () {
+    var R = DCR.tools.radar, ok = [], m;
+    // truncated moments vs R's tnorm_moments()
+    var cases = [[2, 3, 0, 10, 3.242684602, 2.123829249], [10, 3, 0, 10, 7.613552131, 1.792275189],
+                 [0, 2, 0, 10, 1.595764090, 1.205602547], [5, 0.2, 0, 10, 5, 0.2],
+                 [7, 1, 0, 10, 6.995562161, 0.993311023], [0, 20, 0, 10, 4.896725272, 2.873628969],
+                 [3, 1e6, 0, 10, 5, 2.886751346]];
+    cases.forEach(function (c) {
+      m = R.tnormMoments(c[0], c[1], c[2], c[3]);
+      ok.push(near(m.mean, c[4], 1e-6) && near(m.sd, c[5], 1e-6));
+    });
+    m = R.tnormMoments(4, 0, 0, 10); ok.push(m.mean === 4 && m.sd === 0);
+    m = R.tnormMoments(3, 1e9, 0, 10); ok.push(near(m.mean, 5, 1e-9) && near(m.sd, 10 / Math.sqrt(12), 1e-6));
+    // mean at the bound: pulled inside, sd smaller than the drawn one
+    m = R.tnormMoments(10, 3, 0, 10); ok.push(m.mean < 9 && m.sd < 3);
+    ok.push(near(R.erf(0.5), 0.5204998778, 1e-9) && near(R.erf(-1), -0.8427007929, 1e-9) &&
+            near(R.erf(3.5), 0.9999992569, 1e-9) && near(R.erf(0), 0, 1e-15) && R.erf(8) === 1);
+    // rescale: means proportional, sds by the width ratio, clamped
+    var v = R.rescale([0, 5, 10, 2], [0, 10], [100, 200]);
+    ok.push(v.join() === '100,150,200,120' && R.rescale(5, [0, 10], [-1, 1]) === 0);
+    ok.push(R.rescaleSpread([1, 5], [0, 10], [100, 200]).join() === '10,50' &&
+            R.rescaleSpread(5, [0, 10], [0, 4]) === 2);
+    // projection on a spoke, spoke angles (first at the top, clockwise)
+    ok.push(near(R.project([3, 4], 0), 3) && near(R.project([3, 4], Math.PI / 2), 4) &&
+            near(R.project([0, -5], R.spokeAngle(0, 5)), 5) && near(R.spokeAngle(0, 4), -Math.PI / 2) &&
+            near(R.spokeAngle(1, 4), 0));
+    // initial: formula, sd 10 %, 1 group allowed
+    var ini = R.initial(['A', 'B'], [[0, 10], [0, 10], [0, 10]]);
+    ok.push(near(ini.mean[0][0], 7.5) && near(ini.mean[1][0], 2.5) && near(ini.sd[1][2], 1) &&
+            R.initial(1, [[0, 1], [0, 1], [0, 1]]).mean.length === 1);
+    return ok.join(',');
+  })()
+"))
+
+run_check("Radar drags", engine("radar"), paste0(rd_script, "
+  (function () {
+    var ok = [], t, depth, a, b, p, q;
+    // defaults and toSpec shape
+    t = new DCR.tools.radar({clientWidth: 0, clientHeight: 0}, {});
+    var sp = t.toSpec();
+    ok.push(sp.tool === 'radar' && sp.groups.join() === 'A,B' && sp.variables.join() === 'V1,V2,V3,V4,V5' &&
+            sp.n === 50 && sp.integers === false && sp.group_name === 'group' && sp.ranges.length === 5 &&
+            sp.mean.length === 2 && sp.mean[0].length === 5 && sp.sd[0][0] === 1 && t.ui.show === false &&
+            t.ui.target === 'mean');
+    // vertex drag: relative to the grab, first move after the dead zone = pointer delta, one entry
+    t = mk(); depth = t.history._index;
+    p = t._meanPt(0, 2);                      // var 3 at mean 2
+    a = add(p, [5, 0]);                       // grabbed 5 px off the vertex
+    drag(t, [a, add(a, along(t, 2, 2)), add(a, along(t, 2, 4))]);
+    ok.push(t.history._index === depth + 1 && near(t.state.mean[0][2], 2.4) && t.state.mean[0][0] === 9 &&
+            t.state.mean[1][2] === 5 && t.state.sd[0][2] === 1);
+    t.undo(); ok.push(t.state.mean[0][2] === 2 && t.history._index === depth);
+    t = mk(); drag(t, [a, add(a, along(t, 2, 10))]);
+    ok.push(near(t.state.mean[0][2], 3));
+    // the first move after the dead zone can be a long jump of the pointer: still the pointer delta
+    t = mk(); drag(t, [a, add(a, along(t, 2, 30))]);
+    ok.push(near(t.state.mean[0][2], 5));
+    // across the dead zone: nothing below 3 px, and the delta counts from the press
+    t = mk(); depth = t.history._index;
+    drag(t, [a, add(a, along(t, 2, 2.5))]);
+    ok.push(t.history._index === depth && t.state.mean[0][2] === 2);
+    t = mk(); t._pointerDown({button: 0, pointerId: 1, clientX: a[0], clientY: a[1]});
+    t._pointerMove({pointerId: 1, clientX: a[0] + along(t, 2, 2)[0], clientY: a[1] + along(t, 2, 2)[1]});
+    var held = t.state.mean[0][2];
+    t._pointerMove({pointerId: 1, clientX: a[0] + along(t, 2, 4)[0], clientY: a[1] + along(t, 2, 4)[1]});
+    ok.push(held === 2 && near(t.state.mean[0][2], 2.4));
+    t._pointerUp({pointerId: 1});
+    // perpendicular movement: nothing changes, nothing is committed
+    t = mk(); depth = t.history._index;
+    drag(t, [a, add(a, [along(t, 2, 20)[1], -along(t, 2, 20)[0]])]);
+    ok.push(t.history._index === depth);
+    // clamped at both ends
+    t = mk(); drag(t, [a, add(a, along(t, 2, 500))]);
+    ok.push(t.state.mean[0][2] === 10 && finite(t));
+    t = mk(); drag(t, [a, add(a, along(t, 2, -500))]);
+    ok.push(t.state.mean[0][2] === 0 && finite(t));
+    // another group's polygon is selected, not dragged
+    t = mk(); depth = t.history._index;
+    p = t._meanPt(1, 2); q = t._meanPt(1, 3);
+    t._pointerDown({button: 0, pointerId: 1, clientX: (p[0] + q[0]) / 2, clientY: (p[1] + q[1]) / 2});
+    ok.push(t.ui.active === 1 && !t._busy && t.history._index === depth);
+    // edge drag: both ends by the same pointer delta, each along its own spoke
+    t = mk({mean: [[9, 9, 9, 9, 9], [5, 5, 5, 5, 5]]}); depth = t.history._index;
+    p = t._meanPt(0, 0); q = t._meanPt(0, 1);
+    a = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
+    drag(t, [a, [a[0] - 5, a[1] + 5], [a[0] - 10, a[1] + 10]]);
+    var d1 = DCR.tools.radar.project([-10, 10], t._ang(0)) / 100 * 10, d2 = DCR.tools.radar.project([-10, 10], t._ang(1)) / 100 * 10;
+    ok.push(t.history._index === depth + 1 && near(t.state.mean[0][0], 9 + d1) && near(t.state.mean[0][1], 9 + d2) &&
+            near(d1, -1) && t.state.mean[0][2] === 9 && t.state.mean[1][0] === 5);
+    // edge drag clamps each end separately
+    t = mk({mean: [[9.5, 2, 9, 9, 9], [5, 5, 5, 5, 5]]});
+    p = t._meanPt(0, 0); q = t._meanPt(0, 1); a = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
+    drag(t, [a, [a[0], a[1] - 40]]);
+    ok.push(t.state.mean[0][0] === 10 && t.state.mean[0][1] > 2 && t.state.mean[0][1] < 10 && finite(t));
+    // the last edge wraps to the first variable
+    t = mk({mean: [[9, 9, 9, 9, 9], [5, 5, 5, 5, 5]]});
+    p = t._meanPt(0, 4); q = t._meanPt(0, 0); a = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
+    drag(t, [a, [a[0] + 8, a[1] + 8]]);
+    ok.push(t.state.mean[0][4] !== 9 && t.state.mean[0][0] !== 9 && t.state.mean[0][3] === 9);
+    return ok.join(',');
+  })()
+"))
+
+run_check("Radar spread", engine("radar"), paste0(rd_script, "
+  (function () {
+    var ok = [], t, depth, a, p;
+    function sp(o) { var t = mk(o); t.ui.target = 'spread'; return t; }
+    // outer handle: outward grows, relative to the grab; inner handle: inward grows
+    t = sp(); depth = t.history._index;
+    a = t._outPt(0, 2);                         // mean 2, sd 1 on a [0, 10] spoke: 30 px from the centre
+    drag(t, [a, add(a, along(t, 2, 2)), add(a, along(t, 2, 4))]);
+    ok.push(t.history._index === depth + 1 && near(t.state.sd[0][2], 1.4) && t.state.mean[0][2] === 2);
+    t = sp(); drag(t, [a, add(a, along(t, 2, 10))]); ok.push(near(t.state.sd[0][2], 2));
+    t = sp(); drag(t, [a, add(a, along(t, 2, -5))]); ok.push(near(t.state.sd[0][2], 0.5));
+    t = sp(); a = t._inPt(0, 2);
+    drag(t, [a, add(a, along(t, 2, -10))]); ok.push(near(t.state.sd[0][2], 2));
+    t = sp(); drag(t, [a, add(a, along(t, 2, 5))]); ok.push(near(t.state.sd[0][2], 0.5));
+    // clamped to [0, range / 2]
+    t = sp(); a = t._outPt(0, 2);
+    drag(t, [a, add(a, along(t, 2, 900))]); ok.push(t.state.sd[0][2] === 5 && finite(t));
+    drag(t, [t._outPt(0, 2), add(t._outPt(0, 2), along(t, 2, -900))]); ok.push(t.state.sd[0][2] === 0 && finite(t));
+    // sd = 0: the handles coincide; the first movement picks the direction (both grow)
+    var z = [[0, 0, 0, 0, 0], [1, 1, 1, 1, 1]];
+    t = sp({sd: z}); a = t._meanPt(0, 2);
+    ok.push(t._hit(a).type === 'sd' && t._hit(a).sign === 0);
+    drag(t, [a, add(a, along(t, 2, 4))]); ok.push(near(t.state.sd[0][2], 0.4));
+    t = sp({sd: z}); drag(t, [a, add(a, along(t, 2, -4))]); ok.push(near(t.state.sd[0][2], 0.4));
+    t = sp({sd: z}); drag(t, [a, add(a, along(t, 2, 10)), add(a, along(t, 2, -10))]);
+    ok.push(t.state.sd[0][2] === 0 && finite(t));              // back past the start: 0, never negative
+    t = sp({sd: z}); drag(t, [a, add(a, along(t, 2, -10)), add(a, along(t, 2, 10))]);
+    ok.push(t.state.sd[0][2] === 0 && finite(t));
+    t = sp({sd: z}); drag(t, [a, add(a, along(t, 2, -10)), add(a, along(t, 2, -20))]);
+    ok.push(near(t.state.sd[0][2], 2));
+    // pressed again after growing from 0, the handles are apart and the outer one is grabbed
+    a = t._outPt(0, 2); ok.push(t._hit(a).sign === 1);
+    // a tiny sd (handles within 4 px) behaves like sd = 0
+    t = sp({sd: [[0.1, 0.1, 0.1, 0.1, 0.1], [1, 1, 1, 1, 1]]});
+    a = t._meanPt(0, 2); ok.push(t._hit(a).sign === 0);
+    // a mean at the range end: the band is clipped, the handle is still draggable
+    t = sp({mean: [[10, 9, 2, 2, 2], [5, 5, 5, 5, 5]]}); a = t._outPt(0, 0);
+    ok.push(near(a[1], 0));
+    drag(t, [a, add(a, along(t, 0, 10))]); ok.push(near(t.state.sd[0][0], 2) && t.state.mean[0][0] === 10);
+    // tooltip: plain, and (actual ...) when the truncation matters
+    t = mk(); ok.push(t._tipText(0, 2) === 'v3: 2 +- 1');
+    t = mk({mean: [[10, 5, 2, 2, 2], [5, 5, 5, 5, 5]], sd: [[3, 1, 1, 1, 1], [1, 1, 1, 1, 1]]});
+    ok.push(/^v1: 10 \\+- 3 \\(actual 7\\.61 \\+- 1\\.79\\)$/.test(t._tipText(0, 0)) && t._tipText(0, 1).indexOf('actual') < 0);
+    t = mk({mean: [[5, 9, 2, 2, 2], [5, 5, 5, 5, 5]], sd: [[0.5, 1, 1, 1, 1], [1, 1, 1, 1, 1]]});
+    ok.push(t._tipText(0, 0) === 'v1: 5 +- 0.5');
+    return ok.join(',');
+  })()
+"))
+
+run_check("Radar controls", engine("radar"), paste0(rd_script, "
+  (function () {
+    var R = DCR.tools.radar, ok = [], t, depth, i, calls;
+    var mixed = [[0, 10], [-5, 5], [100, 200], [0, 1], [0, 100]];
+    function mx(o) {
+      var base = {ranges: mixed, mean: [[5, 0, 150, 0.5, 50], [2, 1, 120, 0.3, 20]],
+                  sd: [[1, 1, 10, 0.1, 5], [2, 2, 20, 0.2, 10]]};
+      for (var k in (o || {})) base[k] = o[k];
+      return mk(base);
+    }
+    function watch(t) { calls = 0; t.onControls(function () { calls++; }); }
+    // presets: 5 / 10 / 20 % of each range, active group only, one entry, none when unchanged
+    t = mx(); depth = t.history._index;
+    t.action('preset-tight');
+    ok.push(t.history._index === depth + 1 && t.state.sd[0].join() === '0.5,0.5,5,0.05,5' &&
+            t.state.sd[1].join() === '2,2,20,0.2,10');
+    t.action('preset-tight'); ok.push(t.history._index === depth + 1);
+    t.action('preset-medium'); ok.push(t.state.sd[0].join() === '1,1,10,0.1,10');
+    t.action('preset-wide'); ok.push(t.state.sd[0].join() === '2,2,20,0.2,20' && finite(t));
+    t.action('select-2'); t.action('preset-tight');
+    ok.push(t.state.sd[1].join() === '0.5,0.5,5,0.05,5' && t.state.sd[0].join() === '2,2,20,0.2,20');
+    t.undo(); ok.push(t.state.sd[1].join() === '2,2,20,0.2,10');
+    // Same for all groups: copies the active group's sds, one entry, then nothing
+    t = mx(); depth = t.history._index; t.action('same-all');
+    ok.push(t.history._index === depth + 1 && t.state.sd[1].join() === t.state.sd[0].join() &&
+            t.state.sd[0].join() === '1,1,10,0.1,5');
+    t.action('same-all'); ok.push(t.history._index === depth + 1);
+    t = mx(); t.action('select-2'); t.action('same-all'); ok.push(t.state.sd[0].join() === '2,2,20,0.2,10');
+    // ranges (flat from the fields, or pairs from R): proportional, one entry, shape kept
+    t = mx(); depth = t.history._index;
+    t.setControl('ranges', [100, 200, -5, 5, 100, 200, 0, 1, 0, 100]);
+    ok.push(t.history._index === depth + 1 && t.state.ranges[0].join() === '100,200' &&
+            t.state.mean[0][0] === 150 && t.state.mean[1][0] === 120 && t.state.sd[0][0] === 10 && t.state.sd[1][0] === 20 &&
+            t.state.mean[0][1] === 0 && t.state.sd[0][1] === 1 && finite(t));
+    ok.push(t.toSpec().mean[0][0] === 150);
+    t.setControl('ranges', [[100, 200], [-5, 5], [100, 200], [0, 1], [0, 100]]); ok.push(t.history._index === depth + 1);
+    t.setControl('ranges', [[1000, 3000], [-5, 5], [100, 200], [0, 1], [0, 100]]);   // far, non-overlapping
+    ok.push(t.history._index === depth + 2 && t.state.mean[0][0] === 2000 && t.state.mean[1][0] === 1400 &&
+            t.state.sd[0][0] === 200 && finite(t));
+    t.undo(); ok.push(t.state.ranges[0].join() === '100,200' && t.state.mean[0][0] === 150);
+    // invalid ranges: refused, no entry
+    depth = t.history._index;
+    [[5, 5, -5, 5, 100, 200, 0, 1, 0, 100], [9, 3, -5, 5, 100, 200, 0, 1, 0, 100], [0, 'x', -5, 5, 100, 200, 0, 1, 0, 100],
+     [null, 10, -5, 5, 100, 200, 0, 1, 0, 100], [0, 10], [0, 10, -5, 5, 100, 200, 0, 1, 0], null, 'a',
+     [[0, 10], [-5, 5], [100, 200], [0, 1]], [0, 10, -5, 5, 100, 200, 0, 1, 0, Infinity]].forEach(function (v) {
+      t.setControl('ranges', v);
+    });
+    ok.push(t.history._index === depth);
+    // Clear: initial profiles for the current groups, names and ranges kept, one entry, none when clean
+    t = mx(); t.action('preset-wide'); depth = t.history._index;
+    t.clear();
+    var ini = R.initial(2, mixed);
+    ok.push(t.history._index === depth + 1 && t.state.mean[0].join() === ini.mean[0].join() &&
+            t.state.sd[1].join() === ini.sd[1].join() && t.state.ranges.join() === mixed.join() &&
+            t.state.groups.join() === 'A,B' && t.state.variables.join() === 'v1,v2,v3,v4,v5');
+    t.clear(); ok.push(t.history._index === depth + 1);
+    t.undo(); ok.push(t.state.sd[0].join() === '2,2,20,0.2,20');
+    // variables: remap by name; a new one takes the first range, mean at the midpoint, sd 10 %
+    t = mx(); depth = t.history._index;
+    t.setControl('variables', 'v1, w2, v3, v4, v5');
+    ok.push(t.history._index === depth + 1 && t.state.mean[0].join() === '5,0,150,0.5,50' && t.state.variables[1] === 'w2' &&
+            t.state.ranges[1].join() === '-5,5');
+    t.setControl('variables', ['v1', 'w2', 'v3', 'v4', 'v5', 'new']);
+    ok.push(t.history._index === depth + 2 && t.state.ranges[5].join() === '0,10' && t.state.mean[1][5] === 5 &&
+            t.state.sd[0][5] === 1 && t.state.mean[0][2] === 150 && t.state.ranges.length === 6 && finite(t));
+    t.setControl('variables', 'v1, w2, v4, v5, new');
+    ok.push(t.state.mean[0].join() === '5,0,0.5,50,5' && t.state.ranges[2].join() === '0,1' && t.flashed.indexOf('v3') === 0);
+    t.undo(); t.undo(); ok.push(t.state.variables.join() === 'v1,w2,v3,v4,v5' && t.state.mean[1].join() === '2,1,120,0.3,20');
+    depth = t.history._index;
+    ['a, b', 'a, a, b', 'a, b, ', '1,2,3,4,5,6,7,8,9,10,11,12,13', null, ''].forEach(function (v) { t.setControl('variables', v); });
+    ok.push(t.history._index === depth);
+    ok.push(t.controlValue('variables', 'a,b,c,d,e,f,g,h,i,j,k,l').length === 12);
+    // a variable named like the group column: refused, sidebar put back
+    t = mx(); watch(t); depth = t.history._index;
+    t.setControl('variables', 'v1, v2, group');
+    ok.push(t.history._index === depth && calls === 1 && /group column/.test(t.flashed));
+    t.setControl('group_name', 'v2');
+    ok.push(t.history._index === depth && calls === 2 && t.state.group_name === 'group');
+    t.setControl('group_name', ' g '); ok.push(t.state.group_name === 'g' && t.history._index === depth + 1);
+    t.setControl('group_name', 'g'); t.setControl('group_name', ''); t.setControl('group_name', 'a, b');
+    ok.push(t.history._index === depth + 1);
+    t.setControl('variables', 'v1, v2, g'); ok.push(t.history._index === depth + 1 && t.state.variables.length === 5);
+    // groups: remap by name, a new group takes the initial profile of its position
+    t = mx(); depth = t.history._index; t.action('select-2');
+    t.setControl('groups', 'B, A');
+    ok.push(t.history._index === depth + 1 && t.state.mean[0].join() === '2,1,120,0.3,20' && t.state.mean[1][0] === 5 &&
+            t.ui.active === 0 && t.state.sd[0][2] === 20);
+    t.setControl('groups', 'B, A, C');
+    var i3 = R.initial(3, mixed);
+    ok.push(t.state.mean[2].join() === i3.mean[2].join() && t.state.sd[2].join() === i3.sd[2].join() && t.state.mean[1][0] === 5);
+    t.setControl('groups', 'B, X, C');                       // rename keeps the profile
+    ok.push(t.state.groups.join() === 'B,X,C' && t.state.mean[1][0] === 5);
+    t.setControl('groups', 'X'); ok.push(t.state.groups.length === 1 && t.state.mean.length === 1 && /removed/.test(t.flashed));
+    ok.push(t.toSpec().mean.length === 1 && Array.isArray(t.toSpec().mean[0]) && Array.isArray(t.toSpec().sd[0]));
+    t.undo(); ok.push(t.state.groups.length === 3 && t.state.mean[1][0] === 5);
+    depth = t.history._index;
+    ['A, A', 'A,B,C,D,E,F,G,H,I,J,K', '', null, ' , '].forEach(function (v) { t.setControl('groups', v); });
+    ok.push(t.history._index === depth);
+    // n, integers, active, target
+    t = mx(); depth = t.history._index;
+    t.setControl('n', 80); t.setControl('n', 80); t.setControl('integers', true); t.setControl('integers', true);
+    ok.push(t.history._index === depth + 2 && t.state.n === 80 && t.toSpec().integers === true);
+    ['x', 0, 1.5, -2, null, '', 2e6, [3]].forEach(function (v) { t.setControl('n', v); });
+    t.setControl('integers', 'yes'); t.setControl('integers', null);
+    ok.push(t.history._index === depth + 2);
+    watch(t); t.setControl('n', 600000);                        // 2 groups x 6e5 > 1e6
+    ok.push(t.state.n === 80 && calls === 1 && /1e6/.test(t.flashed));
+    t.setControl('n', 500000); ok.push(t.state.n === 500000);
+    t.setControl('groups', 'A, B, C');                          // 3 x 5e5 > 1e6
+    ok.push(t.state.groups.length === 2 && calls >= 2);
+    t.setControl('active', '2'); ok.push(t.ui.active === 1); t.setControl('active', '3'); t.setControl('active', 'x');
+    ok.push(t.ui.active === 1);
+    t.setControl('target', 'spread'); ok.push(t.ui.target === 'spread'); t.setControl('target', 'mean'); t.setControl('target', 'x');
+    ok.push(t.ui.target === 'mean');
+    var c = t.controls();
+    ok.push(c.groups.value === 'A, B' && c.active.value === '2' && c.active.choices.length === 2 && c.variables.value === 'v1, v2, v3, v4, v5' &&
+            c.ranges.value.length === 10 && c.ranges.value[4] === 100 && c.n.value === 500000 && c.integers.value === true && c.group_name.value === 'group');
+    // what controls() pushes is recognised as the value it set (echo guard)
+    ok.push(t.controlValue('ranges', c.ranges.value).join() === mixed.join() && t.controlValue('groups', c.groups.value).join() === 'A,B');
+    // names are trimmed like check_names
+    t = mx(); t.setControl('groups', '  P  ,Q '); ok.push(t.state.groups.join() === 'P,Q');
+    // undo/redo round trip through every kind of edit
+    t = mx(); t.setControl('variables', 'a, b, c'); t.setControl('groups', 'Z'); t.action('preset-wide');
+    t.undo(); t.undo(); t.undo(); ok.push(t.state.variables.length === 5 && t.state.groups.length === 2);
+    t.redo(); t.redo(); ok.push(t.state.variables.length === 3 && t.state.groups.join() === 'Z');
+    return ok.join(',');
+  })()
+"))
+
+run_check("Radar strokes", engine("radar"), paste0(rd_script, "
+  (function () {
+    var ok = [], t, depth, a, p, i, kind;
+    // 200 presses that do not move on vertices, edges and handles: no history, never busy
+    t = mk({mean: [[9, 9, 9, 9, 9], [5, 5, 5, 5, 5]]}); depth = t.history._index;
+    var before = JSON.stringify(t.state);
+    for (i = 0; i < 200; i++) {
+      t.ui.target = i % 2 ? 'spread' : 'mean';
+      kind = i % 3; p = t._meanPt(0, i % 5);
+      if (t.ui.target === 'spread') p = i % 2 ? t._outPt(0, i % 5) : p;
+      else if (kind === 1) { var q = t._meanPt(0, (i + 1) % 5); p = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2]; }
+      drag(t, [p, [p[0] + (i % 3), p[1] + (i % 2)], p]);
+    }
+    ok.push(t.history._index === depth && !t._busy && !t._stroke && JSON.stringify(t.state) === before);
+    // presses on nothing start nothing
+    t._pointerDown({button: 0, pointerId: 1, clientX: 3, clientY: 3});
+    ok.push(!t._busy && !t._stroke);
+    // a right-button press starts nothing
+    p = t._meanPt(0, 0); t._pointerDown({button: 2, pointerId: 1, clientX: p[0], clientY: p[1]});
+    ok.push(!t._busy && !t._stroke);
+    // real drags between sub-dead-zone ones: each is one entry
+    t.ui.target = 'mean'; p = t._meanPt(0, 2);
+    drag(t, [p, [p[0], p[1] + 1]]);
+    drag(t, [p, add(p, along(t, 2, -10))]);
+    ok.push(t.history._index === depth + 1 && !t._busy);
+    t.ui.target = 'spread'; p = t._outPt(0, 4);
+    drag(t, [p, add(p, along(t, 4, 2))]);
+    drag(t, [p, add(p, along(t, 4, 12))]);
+    ok.push(t.history._index === depth + 2 && !t._busy && finite(t));
+    // stale stroke (no end event) recovers on the next press, committing what was dragged
+    t = mk(); depth = t.history._index; p = t._meanPt(0, 2);
+    t._pointerDown({button: 0, pointerId: 1, clientX: p[0], clientY: p[1]});
+    t._pointerMove({pointerId: 1, clientX: p[0] + along(t, 2, 10)[0], clientY: p[1] + along(t, 2, 10)[1]});
+    ok.push(t._busy === true && t.state.mean[0][2] > 2);
+    a = t._meanPt(0, 0);
+    drag(t, [a, add(a, along(t, 0, -10))]);
+    ok.push(!t._busy && !t._stroke && t.history._index === depth + 2 && finite(t));
+    t._pointerDown({button: 0, pointerId: 7, clientX: p[0], clientY: p[1]});
+    t._pointerDown({button: 0, pointerId: 8, clientX: p[0], clientY: p[1]});
+    ok.push(t._stroke.id === 8);
+    t._pointerUp({pointerId: 8});
+    t._dom.svg.hasPointerCapture = function () { return true; };      // still held: the other pointer is ignored
+    t._pointerDown({button: 0, pointerId: 1, clientX: p[0], clientY: p[1]});
+    t._pointerDown({button: 0, pointerId: 2, clientX: p[0], clientY: p[1]});
+    ok.push(t._stroke.id === 1);
+    t._pointerUp({pointerId: 2}); ok.push(!!t._stroke);
+    t._pointerUp({pointerId: 1}); ok.push(!t._stroke && !t._busy);
+    t._dom.svg.hasPointerCapture = undefined;
+    // a mouse move with no button down means the release was lost: the stroke ends
+    t = mk(); depth = t.history._index; p = t._meanPt(0, 2);
+    t._pointerDown({button: 0, pointerId: 1, pointerType: 'mouse', clientX: p[0], clientY: p[1]});
+    t._pointerMove({pointerId: 1, pointerType: 'mouse', buttons: 1, clientX: p[0] + 8, clientY: p[1]});
+    t._pointerMove({pointerId: 1, pointerType: 'mouse', buttons: 0, clientX: p[0] + 20, clientY: p[1]});
+    ok.push(!t._busy && !t._stroke && t.history._index === depth + 1);
+    // a throwing commit never leaves the engine busy
+    t = mk(); p = t._meanPt(0, 2);
+    var real = t.commit, threw = false;
+    t.commit = function () { throw new Error('boom'); };
+    t._pointerDown({button: 0, pointerId: 1, clientX: p[0], clientY: p[1]});
+    t._pointerMove({pointerId: 1, clientX: p[0] + 8, clientY: p[1] + 8});
+    try { t._pointerUp({pointerId: 1}); } catch (e) { threw = true; }
+    t.commit = real;
+    ok.push(threw && !t._busy && !t._stroke);
+    // undo and control messages during a stroke wait for its end; the stroke is one entry
+    t = mk(); depth = t.history._index; p = t._meanPt(0, 2);
+    t._pointerDown({button: 0, pointerId: 1, clientX: p[0], clientY: p[1]});
+    t._pointerMove({pointerId: 1, clientX: p[0] + along(t, 2, 10)[0], clientY: p[1] + along(t, 2, 10)[1]});
+    t.undo(); t.receiveControl('n', 99);
+    ok.push(t.history._index === depth && t.state.n === 50);
+    t._pointerUp({pointerId: 1});
+    ok.push(t.history._index === depth + 1 && t.state.n === 99 && t.state.mean[0][2] === 2 && !t._busy);
+    t.undo(); t.undo(); ok.push(t.state.mean[0][2] === 2 && t.state.n === 50);
+    // preview: at most 300 polylines per group, stable until Resample, inside the rings
+    t = mk({n: 1000}); t.setControl('show', true);
+    var pv = t._previewPaths(300);
+    ok.push(t.ui.show === true && pv.length === 2 && (pv[0].match(/Z/g) || []).length === 300 &&
+            (pv[1].match(/Z/g) || []).length === 300);
+    ok.push(JSON.stringify(t._previewPaths(300)) === JSON.stringify(pv));
+    t.action('resample'); ok.push(JSON.stringify(t._previewPaths(300)) !== JSON.stringify(pv));
+    t = mk({n: 7}); ok.push((t._previewPaths(7)[0].match(/Z/g) || []).length === 7);
+    t = mk({mean: [[10, 10, 0, 0, 0], [5, 5, 5, 5, 5]], sd: [[5, 5, 5, 5, 5], [1, 1, 1, 1, 1]], integers: true});
+    [0, 1, 2].forEach(function (k) {
+      var v = t._previewVals(0, k, 300);
+      ok.push(v.every(function (x) { return x >= 0 && x <= 10 && x === Math.round(x); }));
+    });
+    // the real drawing: spokes, labels as escaped text, handles for the active target, tooltip while dragging
+    t = mk({variables: ['a<b', 'v2', 'v3', 'v4', 'v5']});
+    t._draw = DCR.tools.radar.prototype._draw;
+    t._dom.svg.setAttribute = function () {}; t._dom.note = {style: {}};
+    t._draw();
+    var h = t._dom.svg.innerHTML;
+    ok.push(h.indexOf('a&lt;b') > 0 && h.indexOf('a<b') < 0 && (h.match(/<circle/g) || []).length === 5 &&
+            h.indexOf('<rect') < 0 && h.indexOf('font-size') > 0 && t._dom.note.style.display === 'none');
+    t.ui.target = 'spread'; t.ui.show = true; t._draw(); h = t._dom.svg.innerHTML;
+    ok.push((h.match(/<rect/g) || []).length === 10 && t._dom.note.style.display === '');
+    p = t._meanPt(0, 2); t.ui.target = 'mean'; t.ui.show = false;
+    t._pointerDown({button: 0, pointerId: 1, clientX: p[0], clientY: p[1]});
+    t._pointerMove({pointerId: 1, clientX: p[0] + 8, clientY: p[1] + 8}); t._draw();
+    ok.push(t._dom.svg.innerHTML.indexOf('v3: ') > 0);
+    t._pointerUp({pointerId: 1});
+    return ok.join(',');
+  })()
+"))
+
+# The ranges fields follow the variable list (children only, container kept) and
+# invalid edits are put back; Show sample comes from the checkbox.
+run_check("Radar sidebar DOM", engine("radar"), paste0(rd_script, "
+  (function () {
+    var ok = [], t, events = 0, kids = [], listeners = {};
+    function node(tag) {
+      return {tag: tag, children: [], attrs: {}, className: '', value: '', type: '', style: {},
+              setAttribute: function (k, v) { this.attrs[k] = v; },
+              appendChild: function (c) { this.children.push(c); return c; },
+              querySelectorAll: function (sel) {
+                var out = [];
+                (function walk(n) { n.children.forEach(function (c) { if (c.tag === 'input') out.push(c); walk(c); }); })(this);
+                return out;
+              }};
+    }
+    var box = node('div'); box.id = 'ctl_ranges';
+    Object.defineProperty(box, 'textContent', {set: function () { this.children = []; }, get: function () { return ''; }});
+    box.dispatchEvent = function (ev) { events++; };
+    var show = {id: 'ctl_show', checked: true};
+    window.Event = function (type) { this.type = type; };
+    window.document = {
+      getElementById: function (id) { return id === 'ctl_ranges' ? box : id === 'ctl_show' ? show : null; },
+      createElement: node,
+      addEventListener: function (t, f) { listeners[t] = f; },
+      removeEventListener: function () {}
+    };
+    function vals() { return box.querySelectorAll().map(function (i) { return i.value; }); }
+    t = mk(); t._flash = function () {};
+    ok.push(t.ui.show === true);                         // read from the checkbox
+    t.setControl('variables', 'v1, v2, v3, v4, v5, six');   // new names: rows rebuilt, change fired
+    ok.push(box.children.length === 6 && events === 1 && box.children[5].children[0].textContent === 'six' &&
+            box.children[5].children[0].className === 'dcr-range-name' && box.children[5].children[1].type === 'number' &&
+            box.children[5].children[1].attrs['aria-label'] === 'six min' && box.children[5].children[2].attrs['aria-label'] === 'six max' &&
+            box.children[0].className === 'dcr-range-row' && vals().length === 12 && vals()[11] === '10');
+    t.setControl('ranges', [5, 50, 0, 10, 0, 10, 0, 10, 0, 10, 0, 10]);   // values only: no rebuild
+    ok.push(events === 1 && box.children.length === 6);
+    t.undo(); ok.push(events === 1 && box.children.length === 6 && t.state.ranges[0].join() === '0,10');
+    t.undo(); ok.push(box.children.length === 5 && events === 2);
+    t.redo(); t.redo(); ok.push(box.children.length === 6 && events === 3 && t.state.ranges[0].join() === '5,50');
+    // a name with markup stays text
+    t.setControl('variables', 'v1, <b>x</b>, v3'); ok.push(box.children[1].children[0].textContent === '<b>x</b>' && box.children.length === 3);
+    // an invalid edit of a field makes the tool push its own values back; a valid one does not
+    t = mk(); t._flash = function () {};
+    t.syncControls();                                         // stale rows: rebuilt for this tool
+    var fields = box.querySelectorAll(), pushed = [];
+    ok.push(fields.length === 10 && fields[1].value === '10');
+    t.onControls(function (m) { pushed.push(m); });
+    var fire = function () { listeners.change({target: {id: 'x', closest: function () { return box; }}}); };
+    fields[2].value = '20'; fields[3].value = '5'; fire();       // min >= max
+    ok.push(pushed.length === 1 && pushed[0].ranges.value.join() === '0,10,0,10,0,10,0,10,0,10');
+    fields[2].value = ''; fire();                                 // blank
+    ok.push(pushed.length === 2);
+    fields[2].value = 'abc'; fire(); ok.push(pushed.length === 3);
+    fields[2].value = '-3'; fields[3].value = '5'; fire();        // valid: R forwards it, nothing to put back
+    ok.push(pushed.length === 3);
+    // the checkbox
+    show.checked = false; listeners.change({target: show}); ok.push(t.ui.show === false);
+    show.checked = true; listeners.change({target: show}); ok.push(t.ui.show === true);
+    return ok.join(',');
+  })()
+"))
+
+# Done flushes the sidebar (values not yet sent through R are applied; invalid
+# ones are ignored and never stop Done).
+run_check("Radar Done flush", engine("radar"), paste0(flush_script, "
+  (function () {
+    function mkr(o) {
+      var opts = {groups: ['A', 'B'], variables: ['v1', 'v2', 'v3', 'v4', 'v5'],
+                  ranges: [[0, 10], [0, 10], [0, 10], [0, 10], [0, 10]], n: 50};
+      for (var k in (o || {})) opts[k] = o[k];
+      var t = new DCR.tools.radar(el(), opts);
+      t._flash = function () {};
+      return t;
+    }
+    var d = mkr(), s0 = d.toSpec(), mean04 = s0.mean[0][4];
+    sidebar = {groups: 'A, B, C', variables: 'v1, v2, v3, v4, v5', ranges: [0, 10, 0, 10, 0, 10, 0, 10, 0, 200],
+               target: 'spread', n: 250, integers: true, group_name: 'g', show: true};
+    var s = doneSpec(d);
+    var ok = [s !== null && s.groups.join() === 'A,B,C' && s.n === 250 && s.integers === true && s.group_name === 'g' &&
+            s.ranges[4].join() === '0,200' && s.mean.length === 3 && Math.abs(s.sd[0][4] - 20) < 1e-9 &&
+            Math.abs(s.mean[0][4] - mean04 * 20) < 1e-9 && d.ui.target === 'spread' && d.ui.show === true];
+    // invalid values: ignored, Done still sends
+    var depth = d.history._index;
+    sidebar = {groups: 'A, A', variables: 'a, b', ranges: [0, 10, 5, 5, 0, 10, 0, 10, 0, 10], n: 0, group_name: 'v1',
+               target: 'x', integers: 'maybe', active: '9'};
+    var s2 = doneSpec(d);
+    ok.push(s2 !== null && s2.groups.join() === 'A,B,C' && s2.n === 250 && s2.group_name === 'g' && d.history._index === depth);
+    // too many rows: refused, spec stays valid
+    sidebar = {n: 400000};
+    var s3 = doneSpec(d);
+    ok.push(s3 !== null && s3.n === 250);
+    // a throwing setControl does not stop Done
+    var orig = d.setControl;
+    d.setControl = function () { throw new Error('boom'); };
+    sidebar = {n: 10};
+    ok.push(doneSpec(d) !== null);
+    d.setControl = orig;
+    // a variable rename typed just before Done is part of the spec
+    d = mkr();
+    sidebar = {variables: 'a, b, c, d, e'};
+    var s4 = doneSpec(d);
+    ok.push(s4 !== null && s4.variables.join() === 'a,b,c,d,e' && s4.mean[0].length === 5);
+    return ok.join(',');
+  })()
+"))
+
+# Radar: toSpec() JSON from V8 is accepted by R; the initial profiles equal R's.
+rd_json <- function(setup) {
+  cx <- engine("radar")
+  cx$eval(paste0(rd_script, "var T = (function () {", setup, "})();"))
+  cx$eval("JSON.stringify(T.toSpec())")
+}
+rd_cases <- list(
+  default = "return mk({mean: undefined, sd: undefined});",
+  two_six = "var t = mk({variables: ['a','b','c','d','e','f'],
+      ranges: [[0, 10], [-5, 5], [100, 200], [0, 1], [0, 100], [1, 7]], mean: undefined, sd: undefined});
+    var p = t._meanPt(0, 2), a = add(p, [4, 0]); drag(t, [a, add(a, along(t, 2, 12))]);
+    t.action('preset-wide'); t.action('same-all');
+    t.setControl('ranges', [0, 10, -5, 5, 100, 200, 0, 1, 0, 100, 1, 70]); return t;",
+  one_three = "return mk({groups: ['A'], variables: ['x', 'y', 'z'], ranges: [[0, 10], [0, 1], [-1, 1]],
+      mean: undefined, sd: undefined});",
+  integers = "var t = mk({variables: ['q1', 'q2', 'q3', 'q4'], ranges: [[1, 5], [1, 5], [1, 5], [1, 7]],
+      mean: undefined, sd: undefined}); t.setControl('integers', true); t.setControl('group_name', 'arm'); return t;",
+  ten_groups = "return mk({groups: ['g1','g2','g3','g4','g5','g6','g7','g8','g9','g10'],
+      variables: ['a','b','c','d','e','f','g','h','i','j','k','l'],
+      ranges: [[0,1],[0,1],[0,1],[0,1],[0,1],[0,1],[0,1],[0,1],[0,1],[0,1],[0,1],[0,1]], n: 100,
+      mean: undefined, sd: undefined});",
+  range_end_wide = "var t = mk({mean: [[10, 0, 10, 0, 5], [5, 5, 5, 5, 5]], sd: [[5, 5, 5, 5, 5], [1, 1, 1, 1, 1]]});
+    return t;",
+  zero_sd = "return mk({sd: [[0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]});",
+  after_remap = "var t = mk({mean: undefined, sd: undefined}); t.setControl('variables', 'v1, w2, v3, v4, v5, v6');
+    t.setControl('groups', 'B, A, C'); t.setControl('n', 40); return t;"
+)
+for (nm in names(rd_cases)) {
+  json <- rd_json(rd_cases[[nm]])
+  for (simplify in c(TRUE, FALSE)) {
+    spec <- tryCatch(as_dcr_spec(jsonlite::fromJSON(json, simplifyVector = simplify)),
+                     error = function(e) {
+                       message("Radar round trip failed (", nm, "): ", conditionMessage(e))
+                       quit(status = 1)
+                     })
+    st <- jsonlite::fromJSON(json, simplifyVector = FALSE)
+    k <- length(st$groups)
+    p <- length(st$variables)
+    mat <- function(rows) do.call(rbind, lapply(rows, unlist))
+    stopifnot(inherits(spec, "dcr_spec"), identical(spec$groups, unlist(st$groups)),
+              identical(spec$variables, unlist(st$variables)), identical(dim(spec$mean), c(k, p)),
+              identical(dim(spec$sd), c(k, p)), identical(dim(spec$ranges), c(p, 2L)),
+              isTRUE(all.equal(unname(spec$mean), unname(mat(st$mean)))),
+              isTRUE(all.equal(unname(spec$sd), unname(mat(st$sd)))),
+              isTRUE(all.equal(unname(spec$ranges), unname(mat(st$ranges)))),
+              spec$n == st$n, identical(spec$integers, st$integers), identical(spec$group_name, st$group_name),
+              !spec_is_empty(spec))
+  }
+  df <- sample_spec(spec, 40)
+  stats <- spec_stats(spec)
+  stopifnot(nrow(df) == 40L * k, identical(names(df), c(spec$group_name, spec$variables)),
+            identical(levels(df[[1]]), spec$groups), nrow(stats) == k * p,
+            all(is.finite(stats$mean)), all(is.finite(stats$sd)))
+  for (j in seq_len(p)) {
+    v <- df[[spec$variables[j]]]
+    stopifnot(all(v >= spec$ranges[j, 1]), all(v <= spec$ranges[j, 2]))
+    if (isTRUE(spec$integers)) stopifnot(all(v == round(v)))
+  }
+  if (nm == "zero_sd") stopifnot(all(df$v1[df[[1]] == "A"] == spec$mean[1, 1]))
+  if (nm == "range_end_wide") stopifnot(all(stats$mean[stats$variable == "v1" & stats$group == "A"] < 10))
+  if (nm == "after_remap") stopifnot(identical(spec$groups, c("B", "A", "C")), spec$n == 40)
+}
+
+# The JS initial profiles equal R's radar_initial() (within 1e-9) for many shapes.
+cx <- engine("radar")
+for (kk in c(1L, 2L, 3L, 7L, 10L)) {
+  for (pp in c(3L, 5L, 12L)) {
+    rg <- cbind(seq_len(pp) - 4, seq_len(pp) * 3 + (seq_len(pp) %% 3) * 10)
+    js <- jsonlite::fromJSON(cx$eval(sprintf(
+      "JSON.stringify(DCR.tools.radar.initial(%d, %s))", kk,
+      jsonlite::toJSON(rg, matrix = "rowmajor"))), simplifyVector = FALSE)
+    r <- radar_initial(as.character(seq_len(kk)), rg)
+    stopifnot(isTRUE(all.equal(unname(do.call(rbind, lapply(js$mean, unlist))), unname(r$mean), tolerance = 1e-9)),
+              isTRUE(all.equal(unname(do.call(rbind, lapply(js$sd, unlist))), unname(r$sd), tolerance = 1e-9)))
+  }
+}
+
+
 cat("JS OK (", length(files), " files checked, History, EchoGuard (+expiry), Tool queue, ",
     "Scatter (+offset range, R round trip), Boxplot (+ordering, R round trip), ",
-    "Histogram (+R round trip), Count (+R round trip), Density (+R round trip, Done flush), Bivariate (+R round trip, Done flush), Mosaic (+R round trip, Done flush), Regression (+R round trip, Done flush), ",
+    "Histogram (+R round trip), Count (+R round trip), Density (+R round trip, Done flush), Bivariate (+R round trip, Done flush), Mosaic (+R round trip, Done flush), Regression (+R round trip, Done flush), Radar (+R round trip, Done flush), ",
     "Done flush, Removal notices OK)\n",
     sep = "")
