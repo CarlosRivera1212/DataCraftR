@@ -30,6 +30,7 @@ remotes::install_github("CarlosRivera1212/DataCraftR")
 | `dcr_scatter()` | Points for up to 10 groups (spray, place, erase) | Exactly the drawn points: `x`, `y`, `group` | `xlim`, `ylim`, `groups`, `names` |
 | `dcr_boxplot()` | Q1, median and Q3 of one box per variable | A random sample matching those quartiles | `variables`, `n`, `family` (`"normal"`/`"uniform"`), `ylim` |
 | `dcr_histogram()` | Bar heights for one histogram per variable | A random sample from that population | `variables`, `n`, `xlim`, `nbins` |
+| `dcr_density()` | A smooth density curve per variable (soft Pull / Paint brush) | A random sample from that distribution | `variables`, `n`, `xlim` |
 | `dcr_count()` | Integer counts for every variable and category | Exactly those counts, one row per observation (`variable`, `category`) | `variables`, `categories`, `ymax` |
 
 ## Two ways to use them

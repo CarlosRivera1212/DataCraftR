@@ -17,3 +17,8 @@ Name: Count
 Description: Draw count bars and insert code that loads exactly those counts.
 Binding: dcr_count_addin
 Interactive: true
+
+Name: Density
+Description: Density Curve Data Generator
+Binding: dcr_density_addin
+Interactive: true

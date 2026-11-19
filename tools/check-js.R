@@ -897,7 +897,268 @@ run_check("Removal notices", engine(c("histogram", "count")), paste0(hg_script, 
   })()
 "))
 
+# Density: pull / paint maths, strokes, brush clamp, xlim resampling,
+# variables, actions, and toSpec() accepted by R.
+dn_script <- "
+  function mk(vars, xlim, o) {
+    var opts = {variables: vars, xlim: xlim, n: 1000};
+    for (var k in (o || {})) opts[k] = o[k];
+    var t = new DCR.tools.density({clientWidth: 0, clientHeight: 0,
+      getBoundingClientRect: function () { return {left: 0, top: 0}; }}, opts);
+    t._geo = {left: 0, top: 0, width: 100, height: 100};   // 1 px = 1 percent
+    t._dom = {svg: {setPointerCapture: function () {}}};
+    t.render = function () {};
+    return t;
+  }
+  function stroke(t, pts) {      // pts: [[x, y], ...] in px; paint frames are 100 ms apart
+    t._pointerDown({button: 0, pointerId: 1, clientX: pts[0][0], clientY: pts[0][1]});
+    pts.slice(1).forEach(function (p) {
+      if (t._stroke) t._stroke.last -= 100;
+      t._pointerMove({pointerId: 1, clientX: p[0], clientY: p[1]});
+    });
+    t._pointerUp({pointerId: 1}); t.endStroke();
+  }
+  function near(a, b, e) { return Math.abs(a - b) < (e || 1e-9); }
+  function finite01(t) {
+    return t.state.curves.every(function (c) {
+      return c.length === 201 && c[0] === 0 && c[200] === 0 &&
+        c.every(function (v) { return isFinite(v) && v >= 0 && v <= 1; });
+    });
+  }
+  function zero(c) { return c.every(function (v) { return v === 0; }); }
+"
+run_check("Density", engine("density"), paste0(dn_script, "
+  (function () {
+    var D = DCR.tools.density, ok = [], i;
+    var xs = D.grid([0, 10]);
+    // initial state: one Bell per variable, ends 0, names trimmed, scalar options
+    var t = mk([' A ', 'B'], [0, 10]);
+    var s = t.toSpec();
+    ok.push(s.tool === 'density' && s.variables.join() === 'A,B' && s.n === 1000 &&
+            s.curves.length === 2 && s.curves[0].length === 201 && finite01(t) &&
+            near(s.curves[0][100], 0.85) && s.curves[0][0] === 0);
+    var q = new D({clientWidth: 0, clientHeight: 0}, {variables: 'Q', xlim: [1, 2], n: 5});
+    ok.push(q.toSpec().variables.join() === 'Q' && q.toSpec().xlim.join() === '1,2');
+    // presets: Flat 0.5 inside, ends 0; Skewed peaks near 0.855 and stays in 0..1
+    var flat = D.shape('flat', [0, 10]), sk = D.shape('skew', [0, 10]);
+    ok.push(flat[0] === 0 && flat[200] === 0 && flat[1] === 0.5 && flat[199] === 0.5);
+    ok.push(near(Math.max.apply(null, sk), 0.855, 0.01) && sk.every(function (v) { return v >= 0 && v <= 1; }));
+    // pull: centre moves by dy, 3 sigma away < 2 % of dy, ends stay 0
+    var snap = D.shape('bell', [0, 10]), sig = 1.2;
+    var p = D.pull(snap, xs, 5, 0.1, sig);
+    ok.push(near(p[100] - snap[100], 0.1) && Math.abs(p[172] - snap[172]) < 0.1 * 0.02 &&
+            p[0] === 0 && p[200] === 0);
+    var up = D.pull(snap, xs, 5, 5, sig), dn = D.pull(snap, xs, 5, -5, sig);
+    ok.push(up[100] === 1 && dn[100] === 0 && up[0] === 0 && up[200] === 0 &&
+            up.every(function (v) { return v >= 0 && v <= 1; }) && snap[100] === 0.85);
+    ok.push(D.pull(snap, xs, 5, 0, sig).join() === snap.join());
+    // paint: converges to the cursor height near x0, far points unchanged
+    var ys = D.shape('flat', [0, 10]), far0 = ys[10];
+    for (i = 0; i < 60; i++) D.paint(ys, xs, {x: 5, y: 0.9}, 1, 16);
+    ok.push(near(ys[100], 0.9, 1e-3) && near(ys[10], far0, 1e-3) && ys[0] === 0 && ys[200] === 0);
+    var y2 = D.shape('flat', [0, 10]);
+    D.paint(y2, xs, {x: 5, y: 0}, 1, 1000);        // dt capped: factor 1
+    ok.push(y2[100] === 0 && near(y2[1], 0.5, 1e-4));
+    var y3 = D.shape('flat', [0, 10]); D.paint(y3, xs, {x: 5, y: 1}, 1, 0);
+    ok.push(y3.join() === D.shape('flat', [0, 10]).join());
+    // a Pull drag: one history entry, only the active variable, undo restores
+    t = mk(['A', 'B'], [0, 10]);
+    var depth = t.history._index, before = JSON.stringify(t.state);
+    stroke(t, [[50, 35], [50, 25], [50, 15]]);                 // up by 0.2
+    ok.push(t.history._index === depth + 1 && finite01(t) &&
+            near(t.state.curves[0][100], 1) &&
+            t.state.curves[1].join() === D.shape('bell', [0, 10]).join());
+    t.undo(); ok.push(JSON.stringify(t.state) === before);
+    // a Paint drag
+    t.ui.mode = 'paint';
+    stroke(t, [[50, 90], [50, 90], [50, 90], [50, 90]]);
+    ok.push(t.history._index === depth + 1 && finite01(t) && t.state.curves[0][100] < 0.5);
+    t.undo();
+    // REVIEW FOCUS 1: 200 press/release cycles without movement never block
+    depth = t.history._index; var len = t.history.length;
+    for (i = 0; i < 200; i++) {
+      t.ui.mode = i % 2 ? 'paint' : 'pull';
+      stroke(t, [[20 + i % 60, 30]]);
+    }
+    ok.push(t.history._index === depth && t.history.length === len && !t._stroke &&
+            !t._busy && finite01(t) && JSON.stringify(t.state) === before);
+    // ... also with the stroke-ending events firing twice (up, then lostpointercapture)
+    t._pointerDown({button: 0, pointerId: 1, clientX: 50, clientY: 50});
+    t._pointerUp({pointerId: 1}); t._pointerUp({pointerId: 1}); t.endStroke();
+    ok.push(t.history._index === depth && !t._stroke);
+    // then one real drag adds exactly one entry; undo restores
+    t.ui.mode = 'pull';
+    stroke(t, [[50, 50], [50, 30]]);
+    ok.push(t.history._index === depth + 1 && t.history.length === depth + 2);
+    t.undo(); ok.push(JSON.stringify(t.state) === before);
+    // a press outside the plot or with another button starts nothing
+    t._pointerDown({button: 0, pointerId: 1, clientX: -5, clientY: 50});
+    t._pointerDown({button: 2, pointerId: 1, clientX: 50, clientY: 50});
+    ok.push(!t._stroke);
+    // a control mid-stroke is queued until the stroke is committed
+    t._pointerDown({button: 0, pointerId: 1, clientX: 50, clientY: 50});
+    t.receiveControl('n', 77);
+    ok.push(t.state.n === 1000);
+    t._pointerUp({pointerId: 1}); t.endStroke();
+    ok.push(t.state.n === 77);
+    // REVIEW FOCUS 3: extreme brush widths are clamped, weights stay finite
+    t = mk(['A'], [0, 10]);
+    t.setControl('brush', 1e9);
+    ok.push(t.ui.brush === 1 && near(t._sigma(), 10));
+    t.setControl('brush', 0);
+    ok.push(t.ui.brush === 0.005 && near(t._sigma(), 0.05));
+    t.setControl('brush', -3); ok.push(t.ui.brush === 0.005);
+    t.setControl('brush', 'big'); t.setControl('brush', null); t.setControl('brush', '');
+    ok.push(t.ui.brush === 0.005);
+    [1e9, 0].forEach(function (b) {
+      t.setControl('brush', b);
+      stroke(t, [[50, 50], [50, 20], [60, 20]]);
+      ok.push(finite01(t));
+      t.ui.mode = 'paint'; stroke(t, [[40, 80], [45, 80], [60, 10]]); t.ui.mode = 'pull';
+      ok.push(finite01(t));
+    });
+    var o2 = mk(['A'], [0, 10], {brush: 50});
+    ok.push(o2.ui.brush === 1);
+    // brush keys: x1.2 or /1.2 on the slider step, clamped, synced
+    t = mk(['A'], [0, 10]); var synced = null;
+    t.onControls(function (c) { synced = c; });
+    t.action('brush-up');
+    ok.push(t.ui.brush === 0.145 && synced.brush.value === 0.145);
+    t.action('brush-down'); t.action('brush-down');
+    ok.push(t.ui.brush < 0.12 && t.ui.brush > 0.09);
+    for (i = 0; i < 80; i++) t.action('brush-up');
+    ok.push(t.ui.brush === 1);
+    for (i = 0; i < 80; i++) t.action('brush-down');
+    ok.push(t.ui.brush === 0.005 && synced.brush.value === 0.005);
+    // sigma follows xlim (it is a fraction of the range)
+    t = mk(['A'], [0, 10]); t.setControl('xlim', [0, 100]);
+    ok.push(near(t._sigma(), 12));
+    // REVIEW FOCUS 4: xlim to a disjoint range -> all zero, one entry, undoable
+    t = mk(['A', 'B'], [0, 10]); depth = t.history._index;
+    t.setControl('xlim', [20, 30]);
+    ok.push(t.history._index === depth + 1 && t.state.curves.every(zero) &&
+            t.state.xlim.join() === '20,30' && finite01(t));
+    t.undo(); ok.push(t.state.xlim.join() === '0,10' && !zero(t.state.curves[0]));
+    // xlim overlapping: shape kept at its place on the axis, ends pinned
+    t = mk(['A'], [0, 10]); var c0 = t.state.curves[0].slice();
+    t.setControl('xlim', [0, 20]);
+    var w = t.state.curves[0];
+    ok.push(near(w[50], c0[100], 1e-9) && near(w[0], 0) && w[200] === 0 &&
+            w.slice(101).every(function (v) { return v === 0; }) && !zero(w));
+    t.setControl('xlim', [-10, 20]);
+    ok.push(finite01(t) && near(Math.max.apply(null, t.state.curves[0]), 0.85, 0.01));
+    var r = D.resample(c0, [0, 10], [0, 10]);
+    ok.push(r.every(function (v, j) { return near(v, c0[j], 1e-12); }));
+    // invalid or unchanged controls add no history
+    t = mk(['A'], [0, 10]); depth = t.history._index;
+    t.setControl('xlim', [0, 10]); t.setControl('xlim', [5, 5]); t.setControl('xlim', [10, 0]);
+    t.setControl('xlim', ['', 3]); t.setControl('n', 1000); t.setControl('n', 0);
+    t.setControl('n', 2e6); t.setControl('n', 1.5);
+    t.setControl('variables', 'A'); t.setControl('variables', 'A, A'); t.setControl('variables', ' , x');
+    t.setControl('mode', 'spray'); t.setControl('active', '9');
+    ok.push(t.history._index === depth);
+    t.setControl('mode', 'paint'); ok.push(t.ui.mode === 'paint' && t.history._index === depth);
+    t.setControl('n', 5e5); ok.push(t.history._index === depth + 1 && t.toSpec().n === 5e5);
+    // actions: bell / flat / skew on the active variable only; no entry when unchanged
+    t = mk(['A', 'B'], [0, 10]);
+    t.action('select-2'); t.action('flat');
+    ok.push(t.state.curves[1].join() === D.shape('flat', [0, 10]).join() &&
+            t.state.curves[0].join() === D.shape('bell', [0, 10]).join());
+    var n0 = t.history.length; t.action('flat'); ok.push(t.history.length === n0);
+    t.action('skew'); ok.push(t.state.curves[1].join() === D.shape('skew', [0, 10]).join() &&
+                              t.history.length === n0 + 1);
+    t.action('bell'); ok.push(t.state.curves[1].join() === D.shape('bell', [0, 10]).join());
+    n0 = t.history.length; t.action('bell'); ok.push(t.history.length === n0);
+    // clear: back to Bell for every variable, names / range / n kept, one entry, none if unchanged
+    t.action('flat'); t.ui.active = 0; t.action('flat');
+    n0 = t.history.length; t.clear();
+    ok.push(t.state.curves.every(function (c) { return c.join() === D.shape('bell', [0, 10]).join(); }) &&
+            t.state.variables.join() === 'A,B' && t.history.length === n0 + 1);
+    t.clear(); ok.push(t.history.length === n0 + 1);
+    // variables: keep by name, rename pairs in order, new starts as a Bell
+    t = mk(['A', 'B', 'C'], [0, 10]);
+    var fl = D.shape('flat', [0, 10]), bl = D.shape('bell', [0, 10]), sw = D.shape('skew', [0, 10]);
+    t.state.curves = [fl, sw, bl.map(function () { return 0; })]; t.commit(t.state);
+    t.setControl('variables', 'C, A, D');                  // B renamed to D
+    ok.push(t.state.curves[1].join() === fl.join() && t.state.curves[2].join() === sw.join() &&
+            zero(t.state.curves[0]));
+    t.setControl('variables', 'C, X, D, E');
+    ok.push(t.state.curves.length === 4 && t.state.curves[1].join() === bl.join() &&
+            t.state.curves[3].join() === bl.join() && t.state.curves[2].join() === sw.join());
+    t.setControl('variables', 'D'); ok.push(t.state.curves.length === 1 && t.state.curves[0].join() === sw.join());
+    t.setControl('variables', 'D, D'); ok.push(t.state.variables.join() === 'D');
+    // removal notice: only for a shaped (non-Bell, non-empty) curve; undoable
+    t = mk(['A', 'B', 'C'], [0, 10]);
+    var msgs = []; t._flash = function (m) { msgs.push(m); };
+    t.ui.active = 1; t.action('flat');
+    t.setControl('variables', 'A, B');                     // C is a Bell: no notice
+    ok.push(msgs.length === 0);
+    t.setControl('variables', 'A');                        // B is shaped
+    ok.push(msgs.length === 1 && msgs[0].indexOf('B removed') === 0 && msgs[0].indexOf('Ctrl+Z to undo') > 0);
+    t.undo(); ok.push(t.state.variables.join() === 'A,B' && t.state.curves[1][1] === 0.5);
+    return ok.join(',');
+  })()
+"))
+
+# Density: toSpec() JSON from V8 is accepted by R's as_dcr_spec().
+dn_json <- function(setup) {
+  cx <- engine("density")
+  cx$eval(paste0(dn_script, "var T = (function () {", setup, "})();"))
+  cx$eval("JSON.stringify(T.toSpec())")
+}
+dn_cases <- list(
+  one_variable = "var t = mk(['A'], [0, 10]); stroke(t, [[50, 50], [50, 20]]); return t;",
+  three_variables = "var t = mk(['A', 'B', 'C'], [0, 10]); stroke(t, [[30, 50], [30, 70]]);
+    t.action('select-2'); t.action('skew'); t.action('select-3'); t.action('flat'); return t;",
+  offset_xlim = "var t = mk(['A'], [1000, 1010]); stroke(t, [[40, 50], [40, 80]]); return t;",
+  after_xlim = "var t = mk(['A', 'B'], [0, 10]); t.setControl('xlim', [-5, 20]);
+    t.setControl('xlim', [3, 8]); return t;",
+  all_zero_second = "var t = mk(['A', 'B'], [0, 10]);
+    t.state.curves[1] = t.state.curves[1].map(function () { return 0; }); t.commit(t.state); return t;",
+  disjoint_xlim = "var t = mk(['A'], [0, 10]); t.setControl('xlim', [20, 30]); return t;"
+)
+for (nm in names(dn_cases)) {
+  spec <- tryCatch(as_dcr_spec(jsonlite::fromJSON(dn_json(dn_cases[[nm]]))),
+                   error = function(e) {
+                     message("Density round trip failed (", nm, "): ", conditionMessage(e))
+                     quit(status = 1)
+                   })
+  stopifnot(inherits(spec, "dcr_spec"), spec$n == 1000, is.matrix(spec$curves),
+            ncol(spec$curves) == 201L, all(spec$curves >= 0), all(spec$curves <= 1),
+            all(spec$curves[, 1] == 0), all(spec$curves[, 201] == 0))
+  if (nm == "disjoint_xlim") {
+    stopifnot(spec_is_empty(spec))
+  } else {
+    stopifnot(!spec_is_empty(spec))
+    df <- sample_spec(spec, 50)
+    stopifnot(nrow(df) == 50L, all(is.finite(unlist(df))),
+              all(unlist(df) >= spec$xlim[1]), all(unlist(df) <= spec$xlim[2]))
+    if (nm == "all_zero_second") {
+      stopifnot(identical(attr(df, "dropped"), "B"), ncol(df) == 1L)
+    }
+  }
+}
+
+# Density: Done flushes the sidebar (mode / brush / n / xlim / variables).
+run_check("Density Done flush", engine(c("density")), paste0(flush_script, "
+  (function () {
+    var d = new DCR.tools.density(el(), {variables: ['V1', 'V2', 'V3']});
+    d._flash = function () {};
+    sidebar = {active: '1', variables: 'V1, V2', mode: 'paint', brush: 0.3, n: 250, xlim: [0, 20]};
+    var s = doneSpec(d);
+    return [s !== null && s.n === 250 && s.variables.join() === 'V1,V2' && s.xlim[1] === 20 &&
+            s.curves.length === 2 && d.ui.mode === 'paint' && d.ui.brush === 0.3,
+            // invalid values: ignored, Done still sends
+            (function () {
+              sidebar = {variables: 'A, A', xlim: ['', 3], n: 0, brush: 'big', mode: 'spray'};
+              var s2 = doneSpec(d);
+              return s2 !== null && s2.variables.join() === 'V1,V2' && s2.n === 250;
+            })()].join(',');
+  })()
+"))
+
 cat("JS OK (", length(files), " files checked, History, EchoGuard (+expiry), Tool queue, ",
     "Scatter (+offset range, R round trip), Boxplot (+ordering, R round trip), ",
-    "Histogram (+R round trip), Count (+R round trip), Done flush, Removal notices OK)\n",
+    "Histogram (+R round trip), Count (+R round trip), Density (+R round trip, Done flush), ",
+    "Done flush, Removal notices OK)\n",
     sep = "")

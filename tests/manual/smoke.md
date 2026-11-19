@@ -175,6 +175,54 @@ Start: `df <- dcr_scatter()` (groups A, B, C; x and y ranges 0 to 10).
       reproduces the same data.
 - [ ] Cancel (button and `Esc` outside a field) returns `NULL`.
 
+## Density
+
+- [ ] Open `dcr_density(xlim = c(10, 20))`: one Bell curve (peak 0.85) centred
+      at 15 spans exactly 10 to 20 with its filled area; the Y axis is titled
+      "relative density" (0 to 1). Moving the pointer over the plot shows a
+      dashed falloff curve and a faint vertical line under the cursor.
+- [ ] Pull (default): press on the curve and drag up or down: the part around
+      the press point rises or falls like cloth, the x of the press stays
+      fixed, the curve never leaves 0 to 1 and both ends stay at 0. Releasing
+      and pressing again starts from the new shape.
+- [ ] Paint: press and move freely: the curve moves towards the cursor height
+      wherever you pass, faster the longer you stay. A press without moving
+      changes nothing.
+- [ ] Brush width: the slider, and `[` / `]` (divide / multiply by 1.2), change
+      the falloff preview and the slider together; extreme values (slider at
+      both ends, holding `[` or `]`) never break the curve.
+- [ ] Add variables (`dcr_density(c("A", "B", "C"))`): inactive variables show
+      as faint dashed outlines, the active one is filled; keys `1`-`3` or the
+      buttons switch the active variable; only the active one is edited.
+- [ ] Bell, Flat and Skewed replace the active variable's curve (Flat = 0.5,
+      Skewed has a long right tail); each is one undo step and repeating one
+      adds nothing. The toolbar Clear puts every variable back to a Bell and
+      keeps names, x range and n.
+- [ ] One drag = one undo step (`Ctrl+Z` undoes the whole drag, `Ctrl+Shift+Z`
+      redoes it).
+- [ ] Change the x range after drawing (e.g. 10-20 to 0-30): the curve keeps
+      its place on the axis, is 0 outside the old range and the brush width
+      scales with the new range; undo restores it. A range that does not
+      overlap the old one empties the curves: Done says "Nothing to return
+      yet".
+- [ ] Variables: add `D` (new Bell, others untouched); rename `V2` to `X`
+      (curve kept); remove a shaped one: the message "B removed - Ctrl+Z to
+      undo" shows in the canvas. Invalid (`A, A`, empty, 11 names):
+      notification, no change.
+- [ ] Rapid repeated clicks and drags never freeze: click 50 times quickly on
+      the plot in both modes (clicks without movement add no undo steps), then
+      drag fast in circles in both modes; the tool stays responsive and
+      `Ctrl+Z` steps back through only the real drags.
+- [ ] Edit then Done: draw something, then type in a field and click Done
+      directly, without Enter or a click elsewhere. Sample size `37`:
+      `nrow(df) == 37`; a new x range is applied.
+- [ ] Done from the console returns `n` rows per variable, all inside `xlim`;
+      a variable whose curve was emptied is dropped with a warning.
+- [ ] Done via *Addins > DataCraftR > Density* inserts three lines (spec,
+      seed, load code) and `dcr_load()` of the inserted id reproduces the same
+      data.
+- [ ] Cancel (button and `Esc` outside a field) returns `NULL`.
+
 ## Count
 
 - [ ] Open `dcr_count(c("A", "B"), c("x", "y", "z"), ymax = 20)`: categories on
