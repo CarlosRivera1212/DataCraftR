@@ -1,0 +1,19 @@
+Name: Scatter
+Description: Draw a scatter plot and insert code that loads the drawn points.
+Binding: dcr_scatter_addin
+Interactive: true
+
+Name: Boxplot
+Description: Draw boxplots and insert code that samples data matching them.
+Binding: dcr_boxplot_addin
+Interactive: true
+
+Name: Histogram
+Description: Draw histograms and insert code that samples data matching them.
+Binding: dcr_histogram_addin
+Interactive: true
+
+Name: Count
+Description: Draw count bars and insert code that loads exactly those counts.
+Binding: dcr_count_addin
+Interactive: true

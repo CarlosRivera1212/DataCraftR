@@ -1,0 +1,7 @@
+DataCraftR bundles the following third-party software.
+
+D3 (Data-Driven Documents), version 7.9.0
+  Files:     inst/www/lib/d3/d3.min.js
+  Copyright: 2010-2023 Mike Bostock
+  License:   ISC; full text in inst/www/lib/d3/LICENSE
+  Source:    https://github.com/d3/d3 (tag v7.9.0)

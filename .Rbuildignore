@@ -1,0 +1,13 @@
+^.*\.Rproj$
+^\.Rproj\.user$
+^docs$
+^pkgdown$
+^my_test$
+^\.Rhistory$
+^\.gitignore$
+^LICENSE
+^papers$
+^\.superpowers$
+^AGENTS\.md$
+^tools$
+^tests/manual$
