@@ -535,7 +535,7 @@ Run these in RStudio itself (they cannot be checked from the console tests).
 ## All tools: UI
 
 - [ ] Statistics bar under the canvas is collapsed on open and shows
-      "Statistics \u00b7 n = ..."; click, Enter and Space expand it (table with its
+      "Statistics · n = ..."; click, Enter and Space expand it (table with its
       own scroll) and collapse it again. Check in every tool.
 - [ ] Expanding or collapsing the bar re-lays-out the canvas (no stale size,
       no clipped drawing); mosaic and regression/radar layouts stay correct.
