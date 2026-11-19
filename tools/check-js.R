@@ -1865,6 +1865,18 @@ run_check("Bivariate axes", engine("bivariate"), paste0(bv_script, "
     t.action('reset-axes');
     ok.push(B().contains(t.state.xlim, t.state.ylim, t.state.ell) && t.state.xlim[1] > 10 &&
             t._flashed && t._flashed.length === 1);
+    // reset-axes holds every 2-sigma box, even with every mean inside lim0
+    t = mk(['A']); t.setControl('autofit', false);
+    var nx = DCR.deepCopy(t.state); nx.ell[0] = B().fromMarginal({mean_x: 5, mean_y: 5, sd_x: 4, sd_y: 0.5, rho: 0});
+    t.commit(nx); d0 = t.history._index;
+    ok.push(!B().contains(t.state.xlim, t.state.ylim, t.state.ell));
+    t.action('reset-axes');
+    ok.push(B().contains(t.state.xlim, t.state.ylim, t.state.ell) && t.state.xlim[0] < 0 &&
+            t.state.xlim[1] > 10 && t.state.ylim.join() === '0,10' && t.history._index === d0 + 1);
+    // small ellipses inside lim0: the limits are exactly lim0
+    t = mk(['A', 'B']); t.receiveControl('xlim', [-20, 20]); t.receiveControl('ylim', [-3, 30]);
+    t.action('reset-axes');
+    ok.push(t.state.xlim.join() === '0,10' && t.state.ylim.join() === '0,10');
     // offset axes: initial layout in the middle of the range
     t = mk(['A'], {xlim: [1000, 1010], ylim: [-5, 5]});
     ok.push(near(t.state.ell[0].mx, 1005) && near(t.state.ell[0].my, 0) &&

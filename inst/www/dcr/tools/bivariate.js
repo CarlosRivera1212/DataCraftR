@@ -374,6 +374,19 @@
       if (grew) this._flash("Axes expanded to keep every group in view");
     },
 
+    // Reset axes: the initial limits, grown (never shrunk, rounded like autofit)
+    // to hold every group's 2-sigma box; one history entry.
+    _resetAxes: function () {
+      var s = this.state, next = DCR.deepCopy(s);
+      var lim = expandTo(this.lim0.xlim.slice(), this.lim0.ylim.slice(), s.ell);
+      var grew = !same(lim.xlim, this.lim0.xlim) || !same(lim.ylim, this.lim0.ylim);
+      next.xlim = lim.xlim;
+      next.ylim = lim.ylim;
+      if (!same(next.xlim, s.xlim) || !same(next.ylim, s.ylim)) this.commit(next);
+      else this.syncControls();
+      if (grew) this._flash("Axes expanded to keep every group in view");
+    },
+
     // New group list: ellipses keep their values by name (renames pair in
     // order); new groups start at the view centre.
     _setGroups: function (groups) {
@@ -414,7 +427,7 @@
           this.syncControls();
         }
       } else if (name === "reset-axes") {
-        this._applyLimits(this.lim0.xlim.slice(), this.lim0.ylim.slice());
+        this._resetAxes();
       }
     },
 
