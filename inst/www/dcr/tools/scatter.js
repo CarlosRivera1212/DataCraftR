@@ -307,7 +307,14 @@
     _pointerDown: function (ev) {
       // No preventDefault: the press must still blur a sidebar field so its
       // value is committed (touch scrolling is off via CSS touch-action).
-      if (ev.button !== 0 || this._stroke) return;
+      if (ev.button !== 0) return;
+      if (this._stroke) {
+        // a stroke whose end event never came (lost capture): finish it first
+        var old = this._stroke, svg = this._dom.svg;
+        var held = typeof svg.hasPointerCapture === "function" && svg.hasPointerCapture(old.id);
+        if (ev.pointerId !== old.id && held) return;
+        this._pointerUp({ pointerId: old.id });
+      }
       var d = this._toData(ev), self = this;
       this._dom.svg.setPointerCapture(ev.pointerId);
       this._moveBrush(ev);
@@ -366,8 +373,11 @@
       if (!st || ev.pointerId !== st.id) return;
       if (st.raf) root.cancelAnimationFrame(st.raf);
       this._stroke = null;
-      if (st.changed) this.commit(this.state);
-      this.endStroke();
+      try {
+        if (st.changed) this.commit(this.state);
+      } finally {
+        this.endStroke();
+      }
     },
 
     // ---- Rendering ---------------------------------------------------------

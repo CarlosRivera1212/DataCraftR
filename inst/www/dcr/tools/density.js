@@ -17,6 +17,7 @@
   var MODES = ["pull", "paint"];
   var BRUSH = [0.005, 1], BRUSH_STEP = 0.005;
   var PREVIEW_PX = 26;
+  var DEAD_ZONE = 3;   // px: a press that moves less than this is a click
 
   function trim(s) { return String(s).trim(); }
   function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
@@ -146,7 +147,7 @@
       this.ui = {
         active: 0,
         mode: MODES.indexOf(o.mode) >= 0 ? o.mode : "pull",
-        brush: clampBrush(cleanNumber(o.brush) || 0.12)
+        brush: cleanNumber(o.brush) === null ? 0.12 : clampBrush(cleanNumber(o.brush))
       };
     },
 
@@ -334,19 +335,27 @@
       return {
         x: s.xlim[0] + t * (s.xlim[1] - s.xlim[0]),
         y: clamp((L.top + L.height - py) / L.height, 0, 1),
+        yRaw: (L.top + L.height - py) / L.height,
         inside: px >= L.left && px <= L.left + L.width &&
           py >= L.top && py <= L.top + L.height
       };
     },
 
     _pointerDown: function (ev) {
-      if (ev.button !== 0 || this._stroke || !this._geo) return;
+      if (ev.button !== 0 || !this._geo) return;
+      if (this._stroke) {
+        // a stroke whose end event never came (lost capture): finish it first
+        var old = this._stroke, svg = this._dom.svg;
+        var held = typeof svg.hasPointerCapture === "function" && svg.hasPointerCapture(old.id);
+        if (ev.pointerId !== old.id && held) return;
+        this._pointerUp({ pointerId: old.id });
+      }
       var p = this._toData(ev);
       if (!p.inside) return;
       this._dom.svg.setPointerCapture(ev.pointerId);
       var i = this.activeIndex();
       this._stroke = {
-        id: ev.pointerId, i: i, x0: p.x, y0: p.y, sigma: this._sigma(),
+        id: ev.pointerId, i: i, x0: p.x, y0: p.yRaw, cx: ev.clientX, cy: ev.clientY, moved: false, sigma: this._sigma(),
         start: this.state.curves[i].slice(), last: now()
       };
       this._cursor = p.x;
@@ -359,10 +368,14 @@
       if (!this._geo) return;
       var p = this._toData(ev);
       this._cursor = p.inside || st ? p.x : null;
-      if (st && ev.pointerId === st.id) {
+      if (st && ev.pointerId === st.id && !st.moved &&
+          Math.hypot(ev.clientX - st.cx, ev.clientY - st.cy) >= DEAD_ZONE) {
+        st.moved = true;
+      }
+      if (st && ev.pointerId === st.id && st.moved) {
         var s = this.state, xs = grid(s.xlim, s.curves[st.i].length), t = now();
         if (this.ui.mode === "pull") {
-          s.curves[st.i] = pull(st.start, xs, st.x0, p.y - st.y0, st.sigma);
+          s.curves[st.i] = pull(st.start, xs, st.x0, p.yRaw - st.y0, st.sigma);
         } else {
           paint(s.curves[st.i], xs, p, this._sigma(), t - st.last);
         }
@@ -376,9 +389,12 @@
       var st = this._stroke;
       if (!st || ev.pointerId !== st.id) return;
       this._stroke = null;
-      if (!same(this.state.curves[st.i], st.start)) this.commit(this.state);
-      else this.render();
-      this.endStroke();
+      try {
+        if (!same(this.state.curves[st.i], st.start)) this.commit(this.state);
+        else this.render();
+      } finally {
+        this.endStroke();
+      }
     },
 
     // ---- Rendering -----------------------------------------------------------

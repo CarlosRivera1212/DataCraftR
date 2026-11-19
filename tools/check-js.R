@@ -971,7 +971,7 @@ run_check("Density", engine("density"), paste0(dn_script, "
     t.undo(); ok.push(JSON.stringify(t.state) === before);
     // a Paint drag
     t.ui.mode = 'paint';
-    stroke(t, [[50, 90], [50, 90], [50, 90], [50, 90]]);
+    stroke(t, [[50, 50], [52, 90], [55, 90], [58, 90]]);
     ok.push(t.history._index === depth + 1 && finite01(t) && t.state.curves[0][100] < 0.5);
     t.undo();
     // REVIEW FOCUS 1: 200 press/release cycles without movement never block
@@ -1096,6 +1096,85 @@ run_check("Density", engine("density"), paste0(dn_script, "
     t.setControl('variables', 'A');                        // B is shaped
     ok.push(msgs.length === 1 && msgs[0].indexOf('B removed') === 0 && msgs[0].indexOf('Ctrl+Z to undo') > 0);
     t.undo(); ok.push(t.state.variables.join() === 'A,B' && t.state.curves[1][1] === 0.5);
+    return ok.join(',');
+  })()
+"))
+
+# Density hardening: pull reach, dead zone, stale strokes, throwing commit.
+run_check("Density strokes", engine("density"), paste0(dn_script, "
+  (function () {
+    var D = DCR.tools.density, ok = [], t, depth, i;
+    // M2: Pull uses the unclamped pointer y: press at 0.9 over 0.1, drag far above the top
+    t = mk(['A'], [0, 10]);
+    t.state.curves[0] = t.state.curves[0].map(function (v, j) { return j === 0 || j === 200 ? 0 : 0.1; });
+    t.commit(t.state);
+    stroke(t, [[50, 10], [50, 5], [50, -500]]);
+    ok.push(near(t.state.curves[0][100], 1) && finite01(t));
+    // M3: presses moving less than 3 px commit nothing, in both modes
+    t = mk(['A'], [0, 10]); depth = t.history._index;
+    ['pull', 'paint'].forEach(function (m) {
+      t.ui.mode = m;
+      stroke(t, [[50, 50], [51, 51], [52, 50], [50, 52]]);
+    });
+    ok.push(t.history._index === depth);
+    stroke(t, [[50, 50], [50, 53]]);                       // 3 px: a real drag
+    ok.push(t.history._index === depth + 1);
+    t.ui.mode = 'paint';
+    stroke(t, [[50, 50], [50, 52], [50, 70], [50, 70]]);   // dead zone then paint
+    ok.push(t.history._index === depth + 2);
+    // M1a: a pointerdown while a stale stroke exists (no end event) recovers
+    t = mk(['A'], [0, 10]); depth = t.history._index;
+    t._pointerDown({button: 0, pointerId: 1, clientX: 50, clientY: 50});
+    t._pointerMove({pointerId: 1, clientX: 50, clientY: 30});   // stale, moved, never released
+    ok.push(t._busy === true);
+    stroke(t, [[20, 50], [20, 80]]);                        // same id; and another id below
+    ok.push(!t._busy && !t._stroke && t.history._index === depth + 2 && finite01(t));
+    t._pointerDown({button: 0, pointerId: 7, clientX: 50, clientY: 50});
+    t._pointerDown({button: 0, pointerId: 8, clientX: 50, clientY: 50});   // no hasPointerCapture: stale
+    ok.push(t._stroke.id === 8);
+    t._pointerUp({pointerId: 8}); t.endStroke();
+    // a different pointer that is still captured is ignored
+    t._dom.svg.hasPointerCapture = function () { return true; };
+    t._pointerDown({button: 0, pointerId: 1, clientX: 50, clientY: 50});
+    t._pointerDown({button: 0, pointerId: 2, clientX: 50, clientY: 50});
+    ok.push(t._stroke.id === 1);
+    t._pointerUp({pointerId: 1}); t.endStroke();
+    t._dom.svg.hasPointerCapture = undefined;
+    // M1b: a throwing commit in _pointerUp never leaves the engine busy
+    t = mk(['A'], [0, 10]); t.setControl('n', 5);
+    var real = t.commit;
+    t.commit = function () { throw new Error('boom'); };
+    t._pointerDown({button: 0, pointerId: 1, clientX: 50, clientY: 50});
+    t._pointerMove({pointerId: 1, clientX: 50, clientY: 20});
+    var threw = false;
+    try { t._pointerUp({pointerId: 1}); } catch (e) { threw = true; }
+    t.commit = real;
+    ok.push(threw && !t._busy && !t._stroke);
+    t.undo();
+    ok.push(t.state.n === 1000);
+    // M7: an explicit brush of 0 clamps to the minimum
+    ok.push(mk(['A'], [0, 10], {brush: 0}).ui.brush === 0.005 && mk(['A'], [0, 10]).ui.brush === 0.12);
+    return ok.join(',');
+  })()
+"))
+
+# Histogram: stale stroke recovery and a throwing commit (same pattern as Density).
+run_check("Histogram strokes", engine("histogram"), paste0(hg_script, "
+  (function () {
+    var ok = [], t = mk(['A'], [0, 10], 10);
+    var depth = t.history._index;
+    t._pointerDown({button: 0, pointerId: 1, clientX: 5, clientY: 50});   // never released
+    ok.push(t._busy === true);
+    stroke(t, [[15, 40], [25, 60]]);
+    ok.push(!t._busy && !t._stroke && t.history._index === depth + 2);
+    t = mk(['A'], [0, 10], 10); t.setControl('n', 5);
+    var real = t.commit, threw = false;
+    t.commit = function () { throw new Error('boom'); };
+    t._pointerDown({button: 0, pointerId: 1, clientX: 5, clientY: 50});
+    try { t._pointerUp({pointerId: 1}); } catch (e) { threw = true; }
+    t.commit = real;
+    ok.push(threw && !t._busy);
+    t.undo(); ok.push(t.state.n === 1000);
     return ok.join(',');
   })()
 "))

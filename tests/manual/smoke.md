@@ -185,9 +185,11 @@ Start: `df <- dcr_scatter()` (groups A, B, C; x and y ranges 0 to 10).
       the press point rises or falls like cloth, the x of the press stays
       fixed, the curve never leaves 0 to 1 and both ends stay at 0. Releasing
       and pressing again starts from the new shape.
-- [ ] Paint: press and move freely: the curve moves towards the cursor height
-      wherever you pass, faster the longer you stay. A press without moving
-      changes nothing.
+- [ ] Paint: press and move: the curve moves towards the cursor height while
+      you move, around where you pass. Holding still does nothing until the
+      next move. A press that moves less than 3 px changes nothing (Pull too).
+- [ ] Switch Pull and Paint mid-session (between strokes, several times) and
+      keep editing; nothing gets stuck and each stroke follows the selected mode.
 - [ ] Brush width: the slider, and `[` / `]` (divide / multiply by 1.2), change
       the falloff preview and the slider together; extreme values (slider at
       both ends, holding `[` or `]`) never break the curve.

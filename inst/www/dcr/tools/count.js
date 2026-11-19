@@ -225,7 +225,14 @@
 
     // ---- Painting: one drag = one history entry ------------------------------
     _pointerDown: function (ev) {
-      if (ev.button !== 0 || this._stroke) return;
+      if (ev.button !== 0) return;
+      if (this._stroke) {
+        // a stroke whose end event never came (lost capture): finish it first
+        var old = this._stroke, svg = this._dom.svg;
+        var held = typeof svg.hasPointerCapture === "function" && svg.hasPointerCapture(old.id);
+        if (ev.pointerId !== old.id && held) return;
+        this._pointerUp({ pointerId: old.id });
+      }
       var p = this._toBar(ev);
       if (!p.inside) return;
       this._dom.svg.setPointerCapture(ev.pointerId);
@@ -265,9 +272,12 @@
       var st = this._stroke;
       if (!st || ev.pointerId !== st.id) return;
       this._stroke = null;
-      if (!same(this.state.counts, st.start)) this.commit(this.state);
-      else this.render();
-      this.endStroke();
+      try {
+        if (!same(this.state.counts, st.start)) this.commit(this.state);
+        else this.render();
+      } finally {
+        this.endStroke();
+      }
     },
 
     // Geometry of one category slot: bars of width bw start `pad` in.
