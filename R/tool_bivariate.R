@@ -89,7 +89,8 @@ bivariate_sidebar <- function(options) {
     dcr_section("Editing"),
     dcr_seg_input("ctl_mode", NULL,
                   c(Handles = "handles", Gestures = "gestures"),
-                  selected = options$mode, aria_label = "Editing mode"),
+                  selected = options$mode, aria_label = "Editing mode",
+                  icons = dcr_icons(handles = "handles", gestures = "gesture")),
     dcr_section("Sample"),
     shiny::numericInput("ctl_n", "Sample size per group (n)",
                         value = options$n, min = 1, max = 1e6, step = 1),
@@ -98,8 +99,7 @@ bivariate_sidebar <- function(options) {
     dcr_fields_input("ctl_ylim", "y range", options$ylim, type = "number"),
     shiny::checkboxInput("ctl_autofit", "Fit axes automatically",
                          value = isTRUE(options$autofit)),
-    tags$button(type = "button", class = "btn btn-light btn-sm",
-                `data-dcr-action` = "reset-axes", "Reset axes"),
+    dcr_action_button("reset-axes", "Reset axes", "axes"),
     dcr_section("Names"),
     dcr_fields_input("ctl_names", NULL, unlist(options$names))
   )

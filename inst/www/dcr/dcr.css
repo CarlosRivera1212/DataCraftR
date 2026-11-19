@@ -76,6 +76,7 @@ body { background: var(--dcr-panel); color: var(--dcr-ink); overflow: hidden; }
   align-items: center; justify-content: center; font-size: 15px; line-height: 1;
   background: #fff; border: 1px solid var(--dcr-line); border-radius: var(--dcr-radius);
 }
+.dcr-icon svg { width: 20px; height: 20px; }
 .dcr-icon:hover { border-color: var(--dcr-blue); color: var(--dcr-blue); }
 .dcr-n { margin-left: auto; color: var(--dcr-muted); font-size: 12px; }
 .dcr-n .shiny-text-output { color: var(--dcr-ink); font-weight: 600; }
@@ -107,14 +108,7 @@ body { background: var(--dcr-panel); color: var(--dcr-ink); overflow: hidden; }
 .dcr-sbar:hover { border-color: var(--dcr-blue); }
 .dcr-sbar:focus-visible { outline: 2px solid var(--dcr-blue); outline-offset: -2px; }
 .dcr-sbar .dcr-sum { color: var(--dcr-muted); }
-.dcr-sbar .dcr-chev, .dcr-sbar > svg {
-  margin-left: auto; width: 16px; height: 16px; flex: none; transition: transform .15s;
-}
-.dcr-sbar .dcr-chev {
-  width: 7px; height: 7px; margin-right: 4px; border-right: 1.6px solid currentColor;
-  border-bottom: 1.6px solid currentColor; transform: rotate(45deg);
-}
-.dcr-sbar[aria-expanded="true"] .dcr-chev { transform: rotate(-135deg); }
+.dcr-sbar > svg { margin-left: auto; width: 16px; height: 16px; flex: none; transition: transform .15s; }
 .dcr-sbar[aria-expanded="true"] > svg { transform: rotate(180deg); }
 .dcr-stats {
   margin: -4px 14px 10px; max-height: 30vh; overflow: auto; background: #fff;
@@ -169,6 +163,9 @@ body { background: var(--dcr-panel); color: var(--dcr-ink); overflow: hidden; }
 .dcr-shape:hover { border-color: var(--dcr-blue); color: var(--dcr-blue); }
 .dcr-example { font-family: var(--dcr-mono); font-size: 11px; padding: 2px 6px; border: 1px solid var(--dcr-line); }
 .dcr-seg > button > svg { flex: none; }
+/* Sidebar action buttons: icon before the label */
+.dcr-act { display: inline-flex; align-items: center; gap: 6px; }
+.dcr-act > svg, .dcr-shape > svg { flex: none; }
 .dcr-regnote {
   position: absolute; left: 62px; top: 24px; font-size: 11px; color: var(--dcr-muted);
   background: rgba(255, 255, 255, .85); padding: 1px 6px; border-radius: 99px; pointer-events: none;

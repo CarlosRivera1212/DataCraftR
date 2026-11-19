@@ -205,18 +205,6 @@ regression_icon <- function(d) {
   )
 }
 
-# 20 x 20 glyph for the segmented controls (prototype glyphs).
-regression_seg_icon <- function(d, fill = FALSE) {
-  tags <- htmltools::tags
-  tags$svg(
-    xmlns = "http://www.w3.org/2000/svg", viewBox = "0 0 20 20", width = "20",
-    height = "20", `aria-hidden` = "true", focusable = "false", fill = "none",
-    stroke = "currentColor", `stroke-width` = "1.5", `stroke-linecap` = "round",
-    `stroke-linejoin` = "round",
-    tags$path(d = d, fill = if (fill) "currentColor", `fill-opacity` = if (fill) "0.15")
-  )
-}
-
 regression_sidebar <- function(options) {
   tags <- htmltools::tags
   groups <- options$groups
@@ -241,18 +229,11 @@ regression_sidebar <- function(options) {
     dcr_section("Edit"),
     dcr_seg_input("ctl_target", NULL, c(Curve = "curve", Error = "error"),
                   selected = options$target, aria_label = "Edit target",
-                  icons = list(curve = regression_seg_icon(
-                    "M2 16 C8 16 9 5 18 4"),
-                    error = regression_seg_icon(
-                      "M2 12 C8 12 9 4 18 3 L18 10 C9 11 8 19 2 19 Z",
-                      fill = TRUE))),
+                  icons = dcr_icons(curve = "curve", error = "error")),
     dcr_section("Mode"),
     dcr_seg_input("ctl_mode", NULL, c(Pull = "pull", Paint = "paint"),
                   selected = options$mode, aria_label = "Brush mode",
-                  icons = list(pull = regression_seg_icon(
-                    "M10 3 V17 M6.5 6.5 L10 3 L13.5 6.5 M6.5 13.5 L10 17 L13.5 13.5"),
-                    paint = regression_seg_icon(
-                      "M17 3 L10 10 M10 10 C6.5 9.5 5 12.5 3.5 17 C8 16.5 11 15 10.5 11.5"))),
+                  icons = dcr_icons(pull = "pull", paint = "paint")),
     shiny::sliderInput("ctl_brush",
                        tags$span("Brush ", tags$span(class = "dcr-kbd", "[ ]")),
                        min = 0.005, max = 1, value = options$brush,
@@ -264,8 +245,7 @@ regression_sidebar <- function(options) {
       tags$div(class = "d-flex flex-wrap gap-1 mb-2",
                example("x"), example("sin(x)"), example("log(x)"),
                example("exp(x/3)"), example("x^2/10")),
-      tags$button(type = "button", class = "btn btn-primary btn-sm",
-                  `data-dcr-action` = "apply-equation", "Apply")
+      dcr_action_button("apply-equation", "Apply", "check", primary = TRUE)
     ),
     tags$details(
       class = "dcr-details", open = NA,
@@ -281,8 +261,7 @@ regression_sidebar <- function(options) {
       shiny::sliderInput("ctl_level", "Error level (sd)", min = 0,
                          max = options$level_max, value = options$level,
                          step = 0.01, ticks = FALSE),
-      tags$button(type = "button", class = "btn btn-light btn-sm",
-                  `data-dcr-action` = "fit-y", "Fit to y")
+      dcr_action_button("fit-y", "Fit to y", "fit")
     ),
     tags$details(
       class = "dcr-details", open = NA,
@@ -293,8 +272,7 @@ regression_sidebar <- function(options) {
       shiny::checkboxInput("ctl_shared_x", "Same x for all groups",
                            value = isTRUE(options$shared_x)),
       shiny::checkboxInput("ctl_show", "Show sample", value = FALSE),
-      tags$button(type = "button", class = "btn btn-light btn-sm",
-                  `data-dcr-action` = "resample", "Resample"),
+      dcr_action_button("resample", "Resample", "dice"),
       dcr_fields_input("ctl_names", "Names", unlist(options$names))
     )
   )

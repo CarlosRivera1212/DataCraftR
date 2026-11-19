@@ -95,10 +95,8 @@ mosaic_sidebar <- function(options) {
     dcr_section("Shape"),
     tags$div(
       class = "d-flex flex-wrap gap-2",
-      tags$button(type = "button", class = "btn btn-light btn-sm",
-                  `data-dcr-action` = "independent", "Independent"),
-      tags$button(type = "button", class = "btn btn-light btn-sm",
-                  `data-dcr-action` = "uniform", "Uniform")
+      dcr_action_button("independent", "Independent", "independent"),
+      dcr_action_button("uniform", "Uniform", "uniform")
     ),
     dcr_section("Names"),
     dcr_fields_input("ctl_names", NULL, unlist(options$names))

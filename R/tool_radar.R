@@ -169,18 +169,6 @@ radar_validate <- function(key, value, ctl = list(), ...) {
   )
 }
 
-# 20 x 20 glyph for the segmented controls and presets.
-radar_icon <- function(d, fill = FALSE) {
-  tags <- htmltools::tags
-  tags$svg(
-    xmlns = "http://www.w3.org/2000/svg", viewBox = "0 0 20 20", width = "20",
-    height = "20", `aria-hidden` = "true", focusable = "false", fill = "none",
-    stroke = "currentColor", `stroke-width` = "1.5", `stroke-linecap` = "round",
-    `stroke-linejoin` = "round",
-    tags$path(d = d, fill = if (fill) "currentColor", `fill-opacity` = if (fill) "0.15")
-  )
-}
-
 # The min/max fields of every variable in one `ctl_ranges` container.
 radar_ranges_input <- function(variables, ranges) {
   tags <- htmltools::tags
@@ -205,10 +193,10 @@ radar_sidebar <- function(options) {
   groups <- options$groups
   k <- length(groups)
   ranges <- options$ranges
-  preset <- function(action, label, d) {
+  preset <- function(action, label, icon) {
     tags$button(type = "button", class = "btn btn-light btn-sm dcr-shape",
                 `data-dcr-action` = action, title = label,
-                `aria-label` = label, radar_icon(d))
+                `aria-label` = label, dcr_icon(icon))
   }
   htmltools::tagList(
     tags$details(
@@ -224,11 +212,7 @@ radar_sidebar <- function(options) {
     dcr_section("Edit"),
     dcr_seg_input("ctl_target", NULL, c(Mean = "mean", Spread = "spread"),
                   selected = options$target, aria_label = "Edit target",
-                  icons = list(
-                    mean = radar_icon("M10 2 L17 7 L14.5 16 L5.5 16 L3 7 Z",
-                                      fill = TRUE),
-                    spread = radar_icon(
-                      "M10 1.5 L18 7 L15 17 L5 17 L2 7 Z M10 6 L13.5 8.5 L12.2 13 L7.8 13 L6.5 8.5 Z"))),
+                  icons = dcr_icons(mean = "mean", spread = "spread")),
     tags$details(
       class = "dcr-details", open = NA,
       tags$summary("Variables"),
@@ -242,12 +226,11 @@ radar_sidebar <- function(options) {
       tags$summary("Spread"),
       tags$div(
         class = "d-flex gap-1 mb-2",
-        preset("preset-tight", "Tight (5 %)", "M10 3 V17 M7 6 L10 3 L13 6 M7 14 L10 17 L13 14"),
-        preset("preset-medium", "Medium (10 %)", "M10 2 V18 M6 6 L10 2 L14 6 M6 14 L10 18 L14 14"),
-        preset("preset-wide", "Wide (20 %)", "M10 1 V19 M5 6 L10 1 L15 6 M5 14 L10 19 L15 14 M4 10 H16")
+        preset("preset-tight", "Tight (5 %)", "tight"),
+        preset("preset-medium", "Medium (10 %)", "medium"),
+        preset("preset-wide", "Wide (20 %)", "wide")
       ),
-      tags$button(type = "button", class = "btn btn-light btn-sm",
-                  `data-dcr-action` = "same-all", "Same for all groups")
+      dcr_action_button("same-all", "Same for all groups", "copy")
     ),
     tags$details(
       class = "dcr-details", open = NA,
@@ -257,8 +240,7 @@ radar_sidebar <- function(options) {
       shiny::checkboxInput("ctl_integers", "Integers",
                            value = isTRUE(options$integers)),
       shiny::checkboxInput("ctl_show", "Show sample", value = FALSE),
-      tags$button(type = "button", class = "btn btn-light btn-sm",
-                  `data-dcr-action` = "resample", "Resample"),
+      dcr_action_button("resample", "Resample", "dice"),
       shiny::textInput("ctl_group_name", "Group column name",
                        options$group_name, updateOn = "blur")
     )

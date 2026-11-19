@@ -110,7 +110,7 @@ dcr_stats_panel <- function() {
       tags$b("Statistics"),
       tags$span(class = "dcr-sum", "\u00b7 ",
                 shiny::textOutput("n_sum", inline = TRUE)),
-      tags$span(class = "dcr-chev", `aria-hidden` = "true")
+      dcr_icon("chevron")
     ),
     tags$div(id = "dcr-stats-body", class = "dcr-stats", hidden = NA,
              shiny::tableOutput("stats"))
@@ -152,9 +152,9 @@ dcr_gadget_ui <- function(tool) {
           class = "dcr-main",
           tags$div(
             class = "dcr-toolbar",
-            icon_btn("undo", "Undo (Ctrl+Z)", "\u21b6"),
-            icon_btn("redo", "Redo (Ctrl+Shift+Z)", "\u21b7"),
-            icon_btn("clear", "Clear", "\u232b"),
+            icon_btn("undo", "Undo (Ctrl+Z)", dcr_icon("undo")),
+            icon_btn("redo", "Redo (Ctrl+Shift+Z)", dcr_icon("redo")),
+            icon_btn("clear", "Clear", dcr_icon("clear")),
             tags$span(class = "dcr-n", shiny::textOutput("n", inline = TRUE))
           ),
           tags$div(id = "tool", class = "dcr-tool", `data-tool` = tool$name,

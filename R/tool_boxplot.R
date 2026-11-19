@@ -97,16 +97,15 @@ boxplot_sidebar <- function(options) {
                         min = 1, max = 1e6, step = 1),
     dcr_seg_input("ctl_family", "Distribution",
                   c(Normal = "normal", Uniform = "uniform"),
-                  selected = options$family),
+                  selected = options$family,
+                  icons = dcr_icons(normal = "normal", uniform = "flat")),
     dcr_section("Axes"),
     dcr_fields_input("ctl_ylim", "y range", options$ylim, type = "number"),
     dcr_section("Boxes"),
     tags$div(
       class = "d-flex gap-2",
-      tags$button(type = "button", class = "btn btn-light btn-sm",
-                  `data-dcr-action` = "align", "Align medians"),
-      tags$button(type = "button", class = "btn btn-light btn-sm",
-                  `data-dcr-action` = "reset", "Reset boxes")
+      dcr_action_button("align", "Align medians", "medians"),
+      dcr_action_button("reset", "Reset boxes", "reset")
     )
   )
 }

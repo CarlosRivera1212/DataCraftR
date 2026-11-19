@@ -63,10 +63,6 @@ density_sidebar <- function(options) {
   tags <- htmltools::tags
   vars <- options$variables
   k <- length(vars)
-  action <- function(name, label) {
-    tags$button(type = "button", class = "btn btn-light btn-sm",
-                `data-dcr-action` = name, label)
-  }
   htmltools::tagList(
     dcr_section("Active variable"),
     dcr_seg_input("ctl_active", NULL,
@@ -77,7 +73,8 @@ density_sidebar <- function(options) {
                      paste(vars, collapse = ", "), updateOn = "blur"),
     dcr_section("Brush"),
     dcr_seg_input("ctl_mode", NULL, c(Pull = "pull", Paint = "paint"),
-                  selected = options$mode, aria_label = "Brush mode"),
+                  selected = options$mode, aria_label = "Brush mode",
+                  icons = dcr_icons(pull = "pull", paint = "paint")),
     # Width as a fraction of the x range (sigma = brush * diff(xlim)), so it
     # follows xlim changes by itself.
     shiny::sliderInput("ctl_brush",
@@ -92,7 +89,9 @@ density_sidebar <- function(options) {
     dcr_section("Shape"),
     tags$div(
       class = "d-flex gap-2",
-      action("bell", "Bell"), action("flat", "Flat"), action("skew", "Skewed")
+      dcr_action_button("bell", "Bell", "normal"),
+      dcr_action_button("flat", "Flat", "flat"),
+      dcr_action_button("skew", "Skewed", "skew")
     )
   )
 }
