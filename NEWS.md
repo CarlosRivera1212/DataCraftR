@@ -1,3 +1,8 @@
+# DataCraftR 0.5.6
+
+* Statistics panel is collapsible (collapsed by default) in every tool;
+  consistent icons on all sidebar controls and the toolbar.
+
 # DataCraftR 0.5.5
 
 * New tool `dcr_radar()`: draw group mean profiles and their spread on a radar

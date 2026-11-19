@@ -531,3 +531,13 @@ Run these in RStudio itself (they cannot be checked from the console tests).
       `x <- 1` is unchanged and the file runs.
 - [ ] Scatter stats: the last row "All" shows n, means, sds and r over every
       point.
+
+## All tools: UI
+
+- [ ] Statistics bar under the canvas is collapsed on open and shows
+      "Statistics - n = ..."; click, Enter and Space expand it (table with its
+      own scroll) and collapse it again. Check in every tool.
+- [ ] Expanding or collapsing the bar re-lays-out the canvas (no stale size,
+      no clipped drawing); mosaic and regression/radar layouts stay correct.
+- [ ] Every sidebar seg option and action button shows its icon next to the
+      label; the toolbar shows undo, redo and clear icons (with tooltips).
