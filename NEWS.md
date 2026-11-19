@@ -1,3 +1,10 @@
+# DataCraftR 0.5.1
+
+* New tool `dcr_density()`: sculpt smooth density curves (Pull / Paint brush
+  modes), multiple variables, exact sampling from the drawn curve.
+* Drawing tools recover from a stroke left open by a missed pointer event (no
+  more stuck canvas).
+
 # DataCraftR 0.4.0
 
 The four tools were rebuilt on one shared engine.

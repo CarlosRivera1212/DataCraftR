@@ -1,9 +1,9 @@
 # DataCraftR <img src="man/figures/logo.png" align="right" height="138" alt="" />
 
 **DataCraftR** turns a drawing into a data set. Sketch a scatter plot, a
-histogram, a boxplot or a set of count bars in an interactive gadget, press
-**Done**, and get a `data.frame` back, together with a reproducible
-specification that regenerates the same data.
+histogram, a smooth density curve, a boxplot or a set of count bars in an
+interactive gadget, press **Done**, and get a `data.frame` back, together with
+a reproducible specification that regenerates the same data.
 
 It is meant for teaching and for testing algorithms: you decide the shape of
 the data, and R gives you the numbers.
@@ -23,7 +23,7 @@ install.packages("DataCraftR")
 remotes::install_github("CarlosRivera1212/DataCraftR")
 ```
 
-## The four tools
+## The tools
 
 | Function | What you draw | What you get | Main arguments |
 |---|---|---|---|
@@ -80,7 +80,6 @@ dcr_delete("boxplot_20261117_153012")
 
 In DataCraftR:
 
-- density (1D)
 - bivariate normal
 - correlation matrix
 - proportions / contingency tables
