@@ -2343,8 +2343,577 @@ run_check("Mosaic Done flush", engine("mosaic"), paste0(flush_script, "
   })()
 "))
 
+# ---- Regression --------------------------------------------------------------
+# Pure curve maths, strokes on both targets, presets and level, equation,
+# groups, controls, and toSpec() accepted by R.
+rg_script <- "
+  function ident(k, xlim) {      // y = x on the grid, K = 201
+    var xs = DCR.tools.regression.grid(xlim || [0, 10], 201); return xs.slice();
+  }
+  function mk(groups, xlim, o) {
+    var g = DCR.asArray(groups), xl = xlim || [0, 10];
+    var opts = {groups: groups, xlim: xl, n: 200, level: 1, level_max: 5,
+                f: g.map(function () { return ident(1, xl); }),
+                s: g.map(function () { return ident(1, xl).map(function () { return 1; }); })};
+    for (var k in (o || {})) opts[k] = o[k];
+    var t = new DCR.tools.regression({clientWidth: 0, clientHeight: 0,
+      getBoundingClientRect: function () { return {left: 0, top: 0}; }}, opts);
+    t._geo = {left: 0, top: 0, width: 100, height: 100};   // 1 px = 1 percent
+    t._dom = {svg: {setPointerCapture: function () {}}};
+    t.render = function () {};
+    t._flash = function (m) { t.flashed = m; };
+    return t;
+  }
+  // data (x, y) -> client px under the current geometry and y limits
+  function px(t, x, y) {
+    var s = t.state, yl = t.ui.ylim;
+    return [(x - s.xlim[0]) / (s.xlim[1] - s.xlim[0]) * 100,
+            100 - (y - yl[0]) / (yl[1] - yl[0]) * 100];
+  }
+  function stroke(t, pts) {      // pts in client px; paint frames are 100 ms apart
+    t._pointerDown({button: 0, pointerId: 1, clientX: pts[0][0], clientY: pts[0][1]});
+    pts.slice(1).forEach(function (p) {
+      if (t._stroke) t._stroke.last -= 100;
+      t._pointerMove({pointerId: 1, clientX: p[0], clientY: p[1]});
+    });
+    t._pointerUp({pointerId: 1}); t.endStroke();
+  }
+  function near(a, b, e) { return Math.abs(a - b) < (e || 1e-9); }
+  function allFinite(t) {
+    return t.state.f.every(function (c) { return c.length === 201 && c.every(isFinite); }) &&
+      t.state.s.every(function (c) { return c.length === 201 && c.every(function (v) { return isFinite(v) && v >= 0; }); });
+  }
+  function xsOf(t) { return DCR.tools.regression.grid(t.state.xlim, 201); }
+"
+run_check("Regression maths", engine("regression"), paste0(rg_script, "
+  (function () {
+    var R = DCR.tools.regression, ok = [], i;
+    var xs = R.grid([0, 10], 201);
+    ok.push(xs.length === 201 && xs[0] === 0 && xs[200] === 10 && near(xs[1], 0.05));
+    // pull: centre moves by dy, far points do not, no clamping, ends are free
+    var snap = xs.map(function (x) { return x; }), sig = 1;
+    var p = R.pull(snap, xs, 5, 3, sig);
+    ok.push(near(p[100] - snap[100], 3) && Math.abs(p[180] - snap[180]) < 0.002);
+    var big = R.pull(snap, xs, 5, 1000, sig);
+    ok.push(near(big[100], 1005) && big[0] === snap[0] + 1000 * Math.exp(-0.5 * 25));
+    var atEnd = R.pull(snap, xs, 0, -4, sig);
+    ok.push(near(atEnd[0], -4) && atEnd[200] === snap[200] + (-4) * Math.exp(-0.5 * 100) &&
+            R.pull(snap, xs, 5, 0, sig).join() === snap.join() && snap[100] === 5);
+    // paint: converges to a cursor height outside 0..1, far points unchanged, dt capped, dt 0 no-op
+    var ys = xs.map(function () { return 0; });
+    for (i = 0; i < 80; i++) R.paint(ys, xs, {x: 5, y: 7.3}, 1, 16);
+    ok.push(near(ys[100], 7.3, 1e-3) && Math.abs(ys[0]) < 1e-3);
+    var y2 = xs.map(function () { return 0; });
+    R.paint(y2, xs, {x: 5, y: 2}, 1, 1000);
+    ok.push(near(y2[100], 2));
+    var y3 = xs.map(function () { return 1; });
+    R.paint(y3, xs, {x: 5, y: 2}, 1, 0);
+    ok.push(y3.every(function (v) { return v === 1; }));
+    var y4 = xs.map(function () { return 0; });
+    R.paint(y4, xs, {x: 0, y: -3}, 1, 30);      // ends are free: the end moves, half a step at dt 30
+    ok.push(near(y4[0], -1.5));
+    // error pull: away widens by dy/2 at the centre, toward narrows, never below 0
+    var s0 = xs.map(function () { return 1; }), f0 = xs.slice();
+    var w = R.pullError(s0, f0, xs, 5, 1, sig), n2 = R.pullError(s0, f0, xs, 5, -1, sig);
+    ok.push(near(w[100], 1.5) && near(n2[100], 0.5) && near(w[0], 1, 1e-5));
+    var gone = R.pullError(s0, f0, xs, 5, -50, sig);
+    ok.push(gone[100] === 0 && gone.every(function (v) { return v >= 0; }) &&
+            R.pullError(s0, f0, xs, 5, 0, sig).join() === s0.join() && s0[100] === 1);
+    return ok.join(',');
+  })()
+"))
+
+# Error Paint on a steep curve (Review Focus 1), presets, resample, fitY.
+run_check("Regression error paint and presets", engine("regression"), paste0(rg_script, "
+  (function () {
+    var R = DCR.tools.regression, ok = [], i, x;
+    var xs = R.grid([0, 10], 201);
+    // f = x^2: the cursor stays 1 y-unit above the curve while x sweeps 3 -> 7
+    function sweep(fn) {
+      var f = xs.map(fn), s = xs.map(function () { return 1; });
+      for (x = 3; x <= 7.0001; x += 0.05) {
+        var at = fn(x);
+        R.paintError(s, f, xs, {x: x, y: at + 1}, 0.3, 100);
+      }
+      return s;
+    }
+    var s = sweep(function (v) { return v * v; });
+    var worst = 0;
+    for (i = 0; i < 201; i++) if (xs[i] >= 4 && xs[i] <= 6) worst = Math.max(worst, Math.abs(s[i] - 0.5));
+    ok.push(worst < 0.05);
+    // the same band half-width on a gentle line: independent of the slope
+    var s2 = sweep(function (v) { return 0.1 * v; }), same = true;
+    for (i = 0; i < 201; i++) if (xs[i] >= 4 && xs[i] <= 6 && Math.abs(s2[i] - s[i]) > 0.05) same = false;
+    ok.push(same);
+    // a wrong per-point horizontal target would give about |50 - 36|/2 = 7 near x = 6
+    ok.push(s[120] < 0.6 && s.every(function (v) { return v >= 0; }));
+    // the target is computed once per frame from f at the cursor x: a far cursor
+    // below the curve gives a positive target too (absolute distance)
+    var f1 = xs.map(function (v) { return v * v; }), s3 = xs.map(function () { return 0; });
+    R.paintError(s3, f1, xs, {x: 5, y: 25 - 4}, 1, 100);
+    ok.push(near(s3[100], 2));
+    // paint toward zero distance narrows the band to 0 and never goes negative
+    var s4 = xs.map(function () { return 1; });
+    for (i = 0; i < 60; i++) R.paintError(s4, f1, xs, {x: 5, y: 25}, 1, 100);
+    ok.push(s4[100] >= 0 && s4[100] < 1e-6 && s4.every(function (v) { return v >= 0; }));
+    // dt 0: no change
+    var s5 = xs.map(function () { return 1; });
+    R.paintError(s5, f1, xs, {x: 5, y: 40}, 1, 0);
+    ok.push(s5.every(function (v) { return v === 1; }));
+
+    // presets: t = 0, 0.5, 1 at L = 2 over [0, 10]
+    var L = 2, kinds = {
+      const: function (t) { return L; },
+      cone: function (t) { return L * (0.1 + 0.9 * t); },
+      rcone: function (t) { return L * (0.1 + 0.9 * (1 - t)); },
+      bowtie: function (t) { return L * (0.1 + 0.9 * Math.abs(2 * t - 1)); },
+      bulge: function (t) { return L * (0.1 + 0.9 * (1 - Math.abs(2 * t - 1))); }
+    };
+    var offs = R.grid([100, 110], 201);
+    Object.keys(kinds).forEach(function (k) {
+      var v = R.preset(k, xs, L), o = R.preset(k, offs, L);
+      ok.push(near(v[0], kinds[k](0)) && near(v[100], kinds[k](0.5)) && near(v[200], kinds[k](1)) &&
+              near(v[50], kinds[k](0.25)) && v.length === 201 &&
+              o.every(function (q, j) { return near(q, v[j], 1e-9); }));
+    });
+    ok.push(R.preset('cone', xs, 0).every(function (v) { return v === 0; }));
+    // resample: ends are held outside the old range, identity inside
+    var line = xs.slice(), r = R.resample(line, [0, 10], [-5, 20]), nx = R.grid([-5, 20], 201);
+    ok.push(r[0] === 0 && r[200] === 10 && near(r[nx.indexOf(-5) + 40], 0) &&
+            near(r[100], 7.5, 1e-9) && r.every(isFinite));
+    var inner = R.resample(line, [0, 10], [3, 8]), ix = R.grid([3, 8], 201);
+    ok.push(inner.every(function (v, j) { return near(v, ix[j], 1e-9); }));
+    var neg = R.resample(xs.map(function (v) { return -v - 3; }), [0, 10], [2, 4]);
+    ok.push(near(neg[0], -5, 1e-9) && near(neg[200], -7, 1e-9));
+    // fitY covers f +- 2 s of every group, with padding, and survives degenerate input
+    var fy = R.fitY([[0, 1], [5, 6]], [[0.5, 0.5], [1, 1]]);
+    ok.push(fy[0] < -1 && fy[1] > 8 && fy[0] > -3 && fy[1] < 9);
+    var flat = R.fitY([3, 3, 3], [0, 0, 0]);
+    ok.push(flat[0] < 3 && flat[1] > 3 && isFinite(flat[0]) && isFinite(flat[1]));
+    var one = R.fitY([0, 10], [1, 1]);
+    ok.push(one[0] < -2 && one[1] > 12);
+    return ok.join(',');
+  })()
+"))
+
+# State: defaults, strokes on both targets and modes, hardening (Review Focus 4).
+run_check("Regression strokes", engine("regression"), paste0(rg_script, "
+  (function () {
+    var R = DCR.tools.regression, ok = [], t, depth, i, j;
+    // defaults and toSpec shape (arrays of arrays even for one group)
+    t = mk('A', [0, 10]);
+    var sp = t.toSpec();
+    ok.push(sp.tool === 'regression' && sp.groups.join() === 'A' && sp.n === 200 &&
+            sp.shared_x === true && sp.names.x === 'x' && sp.names.y === 'y' && sp.names.group === 'group' &&
+            sp.f.length === 1 && sp.f[0].length === 201 && sp.s[0].length === 201 &&
+            sp.f[0][200] === 10 && sp.s[0][5] === 1 && sp.xlim.join() === '0,10');
+    ok.push(t.ui.show === false && t.ui.target === 'curve' && t.ui.mode === 'pull' && t.ui.brush === 0.12 &&
+            t.ui.level === 1 && t.ui.lastPreset === null && t.ui.ylim[0] < -2 && t.ui.ylim[1] > 12);
+    // curve pull: one drag = one entry, relative to the grab (no jump at press), undo restores
+    depth = t.history._index;
+    var yl = t.ui.ylim.slice(), f0 = t.state.f[0].slice();
+    var a = px(t, 5, 5), b = px(t, 5, 8);
+    stroke(t, [a, [a[0], a[1] - 1], b]);
+    ok.push(t.history._index === depth + 1 && near(t.state.f[0][100], 8, 1e-6) &&
+            Math.abs(t.state.f[0][100] - 8) < 1e-6 && allFinite(t) && t.ui.ylim[1] > yl[1] - 1e-9);
+    // ylim frozen during the stroke, refit on release
+    t.undo();
+    ok.push(t.state.f[0].join() === f0.join());
+    // press at a point 2 units off the curve, tiny move: the curve moves by the drag, not to the pointer
+    t = mk('A', [0, 10]);
+    a = px(t, 5, 9); b = px(t, 5, 9.5);
+    stroke(t, [a, [a[0], a[1] - 3], b]);
+    ok.push(near(t.state.f[0][100], 5.5, 1e-6));
+    // curve paint reaches the cursor height; paint is not limited to 0..1
+    t = mk('A', [0, 10]); t.ui.mode = 'paint';
+    var pts = [px(t, 5, 5)]; for (i = 0; i < 30; i++) pts.push(px(t, 5, 12 - (i % 2) * 0.01));
+    stroke(t, pts);
+    ok.push(near(t.state.f[0][100], 12, 0.1) && t.history._index === 1);
+    // error pull: away from the curve widens, toward narrows, one entry, s >= 0
+    t = mk('A', [0, 10]); t.ui.target = 'error';
+    a = px(t, 5, 7); b = px(t, 5, 9);        // grab above the curve, drag up 2 -> s + 1
+    stroke(t, [a, [a[0], a[1] - 5], b]);
+    ok.push(near(t.state.s[0][100], 2, 1e-6) && t.history._index === 1 && t.state.f[0].join() === f0.join());
+    t = mk('A', [0, 10]); t.ui.target = 'error';
+    a = px(t, 5, 3); b = px(t, 5, 1);        // grab below the curve, drag down 2 -> widens
+    stroke(t, [a, [a[0], a[1] + 5], b]);
+    ok.push(near(t.state.s[0][100], 2, 1e-6));
+    t = mk('A', [0, 10]); t.ui.target = 'error';
+    a = px(t, 5, 7); b = px(t, 5, 6.5);       // above, drag down 0.5 -> narrows by 0.25
+    stroke(t, [a, [a[0], a[1] + 5], b]);
+    ok.push(near(t.state.s[0][100], 0.75, 1e-6));
+    t = mk('A', [0, 10]); t.ui.target = 'error';
+    a = px(t, 5, 7); b = px(t, 5, -100);      // far toward and past the curve: s never negative
+    stroke(t, [a, [a[0], a[1] + 5], [a[0], a[1] + 500]]);
+    ok.push(t.state.s[0].every(function (v) { return v >= 0; }) && t.state.s[0][100] === 0);
+    // error paint: band follows the curve (cursor 3 above x^2 -> s about 1.5)
+    t = mk('A', [0, 10]); t.ui.mode = 'paint'; t.ui.target = 'error';
+    t.setControl('equation', {f: xsOf(t).map(function (x) { return x * x; })});
+    var sq = t.state.f[0].slice();
+    pts = [px(t, 3, 11)];
+    for (x = 3; x <= 7.001; x += 0.04) pts.push(px(t, x, x * x + 3));
+    var x;
+    stroke(t, pts);
+    var worst = 0;
+    xsOf(t).forEach(function (v, k) { if (v >= 4 && v <= 6) worst = Math.max(worst, Math.abs(t.state.s[0][k] - 1.5)); });
+    ok.push(worst < 0.1 && t.state.f[0].join() === sq.join() && allFinite(t));
+
+    // presses that move less than 3 px commit nothing (200 rapid ones, every target and mode)
+    t = mk('A', [0, 10]); depth = t.history._index;
+    for (i = 0; i < 200; i++) {
+      t.ui.target = i % 2 ? 'error' : 'curve'; t.ui.mode = (i >> 1) % 2 ? 'paint' : 'pull';
+      stroke(t, [[50, 50], [50 + (i % 3), 50 + (i % 2)], [50, 50 - (i % 3)]]);
+    }
+    ok.push(t.history._index === depth && !t._busy && !t._stroke && t.state.f[0][100] === 5);
+    // ...and clicks/drags interleaved with sub-dead-zone ones never freeze
+    t.ui.target = 'curve'; t.ui.mode = 'pull';
+    stroke(t, [[50, 50], [50, 53]]);
+    ok.push(t.history._index === depth + 1);
+    t.ui.mode = 'paint'; t.ui.target = 'error';
+    stroke(t, [[50, 50], [50, 52], [50, 70], [50, 70]]);
+    ok.push(t.history._index === depth + 2 && !t._busy);
+    // stale stroke (no end event) recovers on the next press
+    t = mk('A', [0, 10]); depth = t.history._index;
+    t._pointerDown({button: 0, pointerId: 1, clientX: 50, clientY: 50});
+    t._pointerMove({pointerId: 1, clientX: 50, clientY: 30});
+    ok.push(t._busy === true);
+    stroke(t, [[20, 50], [20, 80]]);
+    ok.push(!t._busy && !t._stroke && t.history._index === depth + 2 && allFinite(t));
+    t._pointerDown({button: 0, pointerId: 7, clientX: 50, clientY: 50});
+    t._pointerDown({button: 0, pointerId: 8, clientX: 50, clientY: 50});
+    ok.push(t._stroke.id === 8);
+    t._pointerUp({pointerId: 8}); t.endStroke();
+    t._dom.svg.hasPointerCapture = function () { return true; };
+    t._pointerDown({button: 0, pointerId: 1, clientX: 50, clientY: 50});
+    t._pointerDown({button: 0, pointerId: 2, clientX: 50, clientY: 50});
+    ok.push(t._stroke.id === 1);
+    t._pointerUp({pointerId: 1}); t.endStroke();
+    t._dom.svg.hasPointerCapture = undefined;
+    // a throwing commit never leaves the engine busy
+    t = mk('A', [0, 10]);
+    var real = t.commit, threw = false;
+    t.commit = function () { throw new Error('boom'); };
+    t._pointerDown({button: 0, pointerId: 1, clientX: 50, clientY: 50});
+    t._pointerMove({pointerId: 1, clientX: 50, clientY: 20});
+    try { t._pointerUp({pointerId: 1}); } catch (e) { threw = true; }
+    t.commit = real;
+    ok.push(threw && !t._busy && !t._stroke);
+    // paint's first frame after the dead zone uses dt = 0 (no jump)
+    t = mk('A', [0, 10]); t.ui.mode = 'paint';
+    t._pointerDown({button: 0, pointerId: 1, clientX: 50, clientY: 50});
+    t._stroke.last -= 5000;                   // a long wait before moving must not paint a full step
+    t._pointerMove({pointerId: 1, clientX: 50, clientY: 40});
+    var after = t.state.f[0][100];
+    t._pointerUp({pointerId: 1}); t.endStroke();
+    ok.push(Math.abs(after - 5) < 1);
+    // brush clamp and sigma as a fraction of diff(xlim)
+    ok.push(mk('A', [0, 10], {brush: 0}).ui.brush === 0.005 && mk('A', [0, 10], {brush: 7}).ui.brush === 1);
+    t = mk('A', [100, 200], {brush: 0.1}); ok.push(near(t._sigma(), 10));
+    return ok.join(',');
+  })()
+"))
+
+# Presets, level, equation, xlim, groups and controls.
+run_check("Regression controls", engine("regression"), paste0(rg_script, "
+  (function () {
+    var R = DCR.tools.regression, ok = [], t, depth, i, a, b;
+    // equation control: one entry, replaces f of the active group only, refits y
+    t = mk(['A', 'B'], [0, 10]); depth = t.history._index;
+    var f1 = t.state.f[1].slice(), yl = t.ui.ylim.slice();
+    var sq = xsOf(t).map(function (x) { return x * x; });
+    t.action('select-1');
+    t.setControl('equation', {f: sq});
+    ok.push(t.history._index === depth + 1 && t.state.f[0].join() === sq.join() &&
+            t.state.f[1].join() === f1.join() && t.ui.ylim[1] > 100 && t.ui.ylim[1] > yl[1]);
+    t.setControl('equation', {f: sq});                          // unchanged: no entry
+    t.setControl('equation', 'x^2');                           // text is not a value
+    t.setControl('equation', {f: [1, 2, 3]});                  // wrong length
+    t.setControl('equation', {f: sq.map(function (v, k) { return k === 3 ? null : v; })});
+    t.setControl('equation', {f: sq.map(function (v, k) { return k === 3 ? 'a' : v; })});
+    ok.push(t.history._index === depth + 1);
+    t.undo();
+    ok.push(t.state.f[0][200] === 10 && t.ui.ylim[1] < 20);
+    // equation on group 2 touches only group 2
+    t.action('select-2'); t.setControl('equation', {f: sq});
+    ok.push(t.state.f[1].join() === sq.join() && t.state.f[0][100] === 5);
+
+    // equation after an xlim change is a fresh array (R evaluated it on the new grid)
+    t = mk('A', [0, 10]);
+    t.setControl('xlim', [1, 5]);
+    var sq2 = xsOf(t).map(function (x) { return x * x; });
+    t.setControl('equation', {f: sq2});
+    ok.push(near(t.toSpec().f[0][200], 25) && near(t.toSpec().f[0][0], 1) && t.toSpec().xlim.join() === '1,5');
+
+    // xlim: one entry, resampled with held ends, y refit
+    t = mk('A', [0, 10]); depth = t.history._index;
+    t.setControl('xlim', [-5, 20]);
+    var sp = t.toSpec();
+    ok.push(t.history._index === depth + 1 && sp.f[0][0] === 0 && sp.f[0][200] === 10 &&
+            near(sp.f[0][100], 7.5) && sp.s[0].every(function (v) { return v === 1; }) &&
+            sp.xlim.join() === '-5,20');
+    t.setControl('xlim', [-5, 20]);
+    t.setControl('xlim', ['', 3]); t.setControl('xlim', [4, 3]); t.setControl('xlim', [0, 'x']);
+    ok.push(t.history._index === depth + 1);
+    t = mk('A', [0, 10]); t.setControl('xlim', [100, 110]);
+    ok.push(t.toSpec().f[0].every(function (v) { return v === 10; }) && t.toSpec().xlim[0] === 100);
+
+    // presets: one entry, set s of the active group, remember lastPreset, not the other group
+    t = mk(['A', 'B'], [0, 10]); depth = t.history._index;
+    t.action('select-2'); t.action('preset-cone');
+    var cone = R.preset('cone', xsOf(t), 1);
+    ok.push(t.history._index === depth + 1 && t.state.s[1].join() === cone.join() &&
+            t.state.s[0][100] === 1 && t.ui.lastPreset === 'cone');
+    t.action('preset-cone');                                    // same again: no entry
+    ok.push(t.history._index === depth + 1);
+    ['const', 'rcone', 'bowtie', 'bulge'].forEach(function (k) {
+      t.action('preset-' + k);
+      ok.push(t.state.s[1].join() === R.preset(k, xsOf(t), 1).join() && t.ui.lastPreset === k);
+    });
+    // level with a preset: re-applies it (live, one entry after the flush)
+    t = mk('A', [0, 10]); t.action('preset-bowtie'); depth = t.history._index;
+    t.setControl('level', 2); t.setControl('level', 3); t.setControl('level', 4);
+    ok.push(t.history._index === depth && t.ui.level === 4 &&
+            t.state.s[0].join() === R.preset('bowtie', xsOf(t), 4).join());
+    t._flushLevel();
+    ok.push(t.history._index === depth + 1 && t.state.s[0].join() === R.preset('bowtie', xsOf(t), 4).join());
+    t._flushLevel();
+    ok.push(t.history._index === depth + 1);
+    t.undo();
+    ok.push(t.state.s[0].join() === R.preset('bowtie', xsOf(t), 1).join() && t.ui.lastPreset === null);
+    // level without a preset (hand-sculpted s): scales by L / L_prev; undo flushes first
+    t = mk('A', [0, 10]); t.ui.target = 'error';
+    a = px(t, 5, 7); b = px(t, 5, 9); stroke(t, [a, [a[0], a[1] - 5], b]);   // s(5) = 2, lastPreset null
+    var sh = t.state.s[0].slice(); depth = t.history._index;
+    t.setControl('level', 2);                                  // from 1 -> x2
+    t.setControl('level', 0.5);                                // base is the burst start: x0.5
+    ok.push(near(t.state.s[0][100], sh[100] * 0.5) && t.history._index === depth);
+    t.undo();                                                  // flush (one entry) then undo it
+    ok.push(t.history._index === depth && t.state.s[0].join() === sh.join());
+    t.redo();
+    ok.push(near(t.state.s[0][100], sh[100] * 0.5) && t.ui.lastPreset === null);
+    // a second burst scales from the first (L_prev follows the slider)
+    t.setControl('level', 1); t._flushLevel();
+    ok.push(near(t.state.s[0][100], sh[100]));
+    // a hand error stroke, undo/redo and Clear clear lastPreset
+    t = mk('A', [0, 10]); t.action('preset-cone'); t.ui.target = 'error';
+    a = px(t, 5, 7); b = px(t, 5, 8); stroke(t, [a, [a[0], a[1] - 5], b]);
+    ok.push(t.ui.lastPreset === null);
+    t.action('preset-cone'); t.undo(); ok.push(t.ui.lastPreset === null);
+    t.redo(); t.action('preset-bulge'); t.clear(); ok.push(t.ui.lastPreset === null);
+    // a curve stroke does not clear it
+    t = mk('A', [0, 10]); t.action('preset-cone'); t.ui.target = 'curve';
+    a = px(t, 5, 5); b = px(t, 5, 8); stroke(t, [a, [a[0], a[1] - 5], b]);
+    ok.push(t.ui.lastPreset === 'cone');
+    // Clear restores the initial f and s of every group, one entry, then nothing more
+    t = mk(['A', 'B'], [0, 10]);
+    t.action('preset-cone'); t.setControl('equation', {f: xsOf(t).map(function () { return 3; })});
+    t.action('select-2'); t.action('preset-bulge'); depth = t.history._index;
+    t.clear();
+    ok.push(t.history._index === depth + 1 && t.state.f[0].join() === ident().join() &&
+            t.state.f[1].join() === ident().join() && t.state.s[1][0] === 1 && t.state.s[0][50] === 1);
+    t.clear(); ok.push(t.history._index === depth + 1);
+    // Clear keeps the current xlim: the initial curves are resampled onto it
+    t = mk('A', [0, 10]); t.setControl('xlim', [0, 20]); t.action('preset-cone'); t.clear();
+    ok.push(t.state.xlim[1] === 20 && near(t.state.f[0][100], 10) && t.state.f[0][200] === 10);
+    // y covers every group
+    t = mk(['A', 'B'], [0, 10]);
+    t.action('select-2'); t.setControl('equation', {f: xsOf(t).map(function (x) { return 100 + x; })});
+    ok.push(t.ui.ylim[1] > 112 && t.ui.ylim[0] < -1);
+    t.ui.ylim = [0, 1]; t.action('fit-y');
+    ok.push(t.ui.ylim[1] > 112);
+    return ok.join(',');
+  })()
+"))
+
+# Groups, shared x, n x groups, names, active selection and Done flush.
+run_check("Regression groups", engine("regression"), paste0(rg_script, "
+  (function () {
+    var R = DCR.tools.regression, ok = [], t, depth, i, a, b;
+    // a stroke edits only the active group
+    t = mk(['A', 'B', 'C'], [0, 10]);
+    t.run('select-2');
+    ok.push(t.ui.active === 1);
+    a = px(t, 5, 5); b = px(t, 5, 8); stroke(t, [a, [a[0], a[1] - 5], b]);
+    ok.push(near(t.state.f[1][100], 8, 1e-6) && t.state.f[0][100] === 5 && t.state.f[2][100] === 5);
+    t.run('select-9'); ok.push(t.ui.active === 1);
+    t.run('select-3'); ok.push(t.ui.active === 2);
+    t.setControl('active', '1'); ok.push(t.ui.active === 0);
+    t.setControl('active', '7'); ok.push(t.ui.active === 0);
+    // rename keeps curves; renamed in order
+    t.setControl('active', '2');
+    t.setControl('groups', 'A, Beta, C');
+    ok.push(t.state.groups.join() === 'A,Beta,C' && near(t.state.f[1][100], 8, 1e-6) && t.ui.active === 1);
+    // add: the new group starts from the initial f and s (even after the view changed)
+    t.setControl('xlim', [0, 20]);
+    t.setControl('groups', 'A, Beta, C, D');
+    ok.push(t.state.f.length === 4 && t.state.s.length === 4 && near(t.state.f[3][100], 10) &&
+            t.state.f[3][200] === 10 && t.state.s[3][0] === 1 && t.state.f[3].length === 201);
+    // remove: notice, curves of the survivors kept, undo restores, active follows
+    t.flashed = null; depth = t.history._index;
+    t.setControl('active', '2');
+    t.setControl('groups', 'A, C, D');
+    ok.push(/Beta/.test(t.flashed || '') && /Ctrl\\+Z/.test(t.flashed) && t.state.groups.join() === 'A,C,D' &&
+            t.state.f.length === 3 && t.history._index === depth + 1 && t.ui.active === 0);
+    t.undo();
+    ok.push(t.state.groups.join() === 'A,Beta,C,D' && near(t.state.f[1][50], t.state.f[1][50]));
+    // invalid group lists change nothing
+    depth = t.history._index;
+    ['A, A', ',', '', 'a,b,c,d,e,f,g,h,i,j,k'].forEach(function (v) { t.setControl('groups', v); });
+    ok.push(t.history._index === depth);
+    // more than ten groups are refused; ten are fine and use the whole palette
+    t.setControl('groups', 'g1,g2,g3,g4,g5,g6,g7,g8,g9,g10');
+    ok.push(t.state.groups.length === 10 && t.state.f.length === 10 && allFinite(t));
+    // shared_x: a boolean control, one undoable entry, ignored when unchanged
+    t = mk(['A', 'B'], [0, 10]); depth = t.history._index;
+    t.setControl('shared_x', false);
+    ok.push(t.toSpec().shared_x === false && t.history._index === depth + 1);
+    t.setControl('shared_x', false); t.setControl('shared_x', 'no'); t.setControl('shared_x', null);
+    ok.push(t.history._index === depth + 1);
+    t.undo(); ok.push(t.toSpec().shared_x === true);
+    ok.push(mk('A', [0, 10], {shared_x: false}).toSpec().shared_x === false);
+    // n: whole 1-1e6; n x groups refusal flashes and resyncs the sidebar
+    t = mk(['A', 'B', 'C'], [0, 10]); depth = t.history._index;
+    var synced = [];
+    t.onControls(function (m) { synced.push(m); });
+    t.setControl('n', 400000);
+    ok.push(t.state.n === 200 && /1e6/.test(t.flashed || '') && synced.length === 1 &&
+            synced[0].n.value === 200 && t.history._index === depth);
+    t.flashed = null; synced = [];
+    t.setControl('groups', 'A,B,C,D,E');
+    ok.push(t.state.groups.length === 5);
+    t.setControl('n', 250000);
+    ok.push(t.state.n === 200 && !!t.flashed);
+    t.flashed = null; synced = [];
+    t.setControl('n', 200000);
+    ok.push(t.state.n === 200000 && !t.flashed);
+    t.setControl('groups', 'A,B,C,D,E,F');
+    ok.push(t.state.groups.length === 5 && !!t.flashed && synced.length > 0 &&
+            synced[synced.length - 1].groups.value === 'A, B, C, D, E');
+    ['0', 2.5, 1e6 + 1, '', null, true].forEach(function (v) { t.setControl('n', v); });
+    ok.push(t.state.n === 200000);
+    ok.push(mk('A', [0, 10], {n: 1e6}).state.n === 1e6);
+    ok.push(mk(['A', 'B'], [0, 10], {n: 1e6}).state.n === 500000);
+    // names and brush / mode / target controls
+    t = mk('A', [0, 10]); depth = t.history._index;
+    t.setControl('names', {x: 'dose', y: 'resp', group: 'trt'});
+    ok.push(t.toSpec().names.x === 'dose' && t.history._index === depth + 1);
+    t.setControl('names', {x: 'a', y: 'a', group: 'b'}); t.setControl('names', {x: 'a'});
+    ok.push(t.history._index === depth + 1);
+    t.setControl('mode', 'paint'); t.setControl('target', 'error'); t.setControl('brush', 0.3);
+    ok.push(t.ui.mode === 'paint' && t.ui.target === 'error' && t.ui.brush === 0.3 && t.history._index === depth + 1);
+    t.setControl('mode', 'spray'); t.setControl('target', 'x'); t.setControl('brush', 'big');
+    ok.push(t.ui.mode === 'paint' && t.ui.target === 'error' && t.ui.brush === 0.3);
+    t.action('brush-up'); ok.push(t.ui.brush > 0.3); t.action('brush-down'); t.action('brush-down');
+    ok.push(t.ui.brush < 0.3);
+    // show sample is a view option: not in the spec or history
+    depth = t.history._index; var spec = JSON.stringify(t.toSpec());
+    t.setControl('show', true); t.action('resample');
+    ok.push(t.ui.show === true && t.history._index === depth && JSON.stringify(t.toSpec()) === spec);
+    // sample preview: shared x honoured, residuals follow s, regenerated by Resample
+    t = mk(['A', 'B'], [0, 10], {n: 50}); t.setControl('show', true);
+    var smp = t._sampleFor();
+    ok.push(smp.length === 2 && smp[0].x.length === 50 && smp[0].x.join() === smp[1].x.join() &&
+            smp[0].y.every(isFinite) && smp[0].x.every(function (v) { return v >= 0 && v <= 10; }));
+    t.setControl('shared_x', false);
+    var smp2 = t._sampleFor();
+    ok.push(smp2[0].x.join() !== smp2[1].x.join());
+    var before = JSON.stringify(t._sampleFor()); t.action('resample');
+    ok.push(JSON.stringify(t._sampleFor()) !== before);
+    // zero error: the sample sits on the curve
+    t = mk('A', [0, 10], {n: 20, s: [ident().map(function () { return 0; })]}); t.setControl('show', true);
+    smp = t._sampleFor();
+    ok.push(smp[0].y.every(function (v, k) { return near(v, smp[0].x[k], 1e-9); }));
+    return ok.join(',');
+  })()
+"))
+
+# Done flushes the sidebar (equation text and a stale level are not applied).
+run_check("Regression Done flush", engine("regression"), paste0(flush_script, "
+  (function () {
+    function mkr(o) {
+      var xs = DCR.tools.regression.grid([0, 10], 201);
+      var opts = {groups: ['A', 'B'], n: 100, level: 1, level_max: 5, f: [xs, xs],
+                  s: [xs.map(function () { return 1; }), xs.map(function () { return 1; })]};
+      for (var k in (o || {})) opts[k] = o[k];
+      return new DCR.tools.regression(el(), opts);
+    }
+    var d = mkr();
+    d._flash = function () {};
+    sidebar = {active: '2', groups: 'A, B, C', target: 'error', mode: 'paint', brush: 0.3, n: 250,
+               xlim: [0, 20], shared_x: false, equation: 'x^2', level: 1,
+               names: {x: 'h', y: 'w', group: 'g'}, show: true};
+    var s = doneSpec(d);
+    var ok = [s !== null && s.n === 250 && s.groups.join() === 'A,B,C' && s.xlim[1] === 20 &&
+            s.shared_x === false && s.names.x === 'h' && s.f.length === 3 && s.f[0][200] === 10 &&
+            d.ui.mode === 'paint' && d.ui.target === 'error' && d.ui.show === true];
+    // invalid values: ignored, Done still sends
+    sidebar = {groups: 'A, A', xlim: ['', 3], n: 0, brush: 'big', mode: 'spray', level: 'x',
+               names: {x: 'a', y: 'a', group: 'b'}};
+    var s2 = doneSpec(d);
+    ok.push(s2 !== null && s2.groups.join() === 'A,B,C' && s2.n === 250);
+    // too many rows: refused, spec stays valid
+    sidebar = {n: 400000};
+    var s3 = doneSpec(d);
+    ok.push(s3 !== null && s3.n === 250);
+    // a pending level burst is part of what Done returns
+    d = mkr(); d.setControl('level', 3);
+    var s4 = doneSpec(d);
+    ok.push(s4 !== null && s4.s[0][0] === 3 && s4.s[1][0] === 1);
+    return ok.join(',');
+  })()
+"))
+
+# Regression: toSpec() JSON from V8 is accepted by R, samples and stats are finite.
+rg_json <- function(setup) {
+  cx <- engine("regression")
+  cx$eval(paste0(rg_script, "var T = (function () {", setup, "})();"))
+  cx$eval("JSON.stringify(T.toSpec())")
+}
+rg_cases <- list(
+  default = "return mk('A', [0, 10]);",
+  three_shared = "var t = mk(['A', 'B', 'C'], [0, 10]); t.run('select-2'); t.action('preset-cone');
+    var a = px(t, 5, 5), b = px(t, 5, 8); stroke(t, [a, [a[0], a[1] - 5], b]); return t;",
+  three_unshared = "var t = mk(['A', 'B', 'C'], [0, 10]); t.setControl('shared_x', false);
+    t.setControl('names', {x: 'dose', y: 'resp', group: 'trt'}); return t;",
+  after_equation = "var t = mk(['A', 'B'], [0, 10]); t.run('select-2');
+    t.setControl('xlim', [1, 5]);
+    t.setControl('equation', {f: xsOf(t).map(function (x) { return Math.log(x); })}); return t;",
+  offset_xlim = "var t = mk('A', [100, 110]); t.action('preset-bulge');
+    var a = px(t, 105, 105), b = px(t, 105, 108); stroke(t, [a, [a[0], a[1] - 5], b]); return t;",
+  zero_error = "var t = mk('A', [0, 10]); t.setControl('level', 0); t.action('preset-const');
+    t._flushLevel(); return t;",
+  zero_error_option = "return mk('A', [0, 10], {s: [DCR.tools.regression.grid([0, 10], 201).map(function () { return 0; })]});"
+)
+for (nm in names(rg_cases)) {
+  spec <- tryCatch(as_dcr_spec(jsonlite::fromJSON(rg_json(rg_cases[[nm]]))),
+                   error = function(e) {
+                     message("Regression round trip failed (", nm, "): ", conditionMessage(e))
+                     quit(status = 1)
+                   })
+  k <- length(spec$groups)
+  stopifnot(inherits(spec, "dcr_spec"), spec$n == 200, is.matrix(spec$f),
+            identical(dim(spec$f), c(k, 201L)), identical(dim(spec$s), c(k, 201L)),
+            all(spec$s >= 0), !spec_is_empty(spec))
+  df <- sample_spec(spec, 30)
+  st <- spec_stats(spec)
+  stopifnot(nrow(df) == 30L * k, is.factor(df[[3]]), all(is.finite(df[[1]])),
+            all(is.finite(df[[2]])), nrow(st) == k,
+            all(is.finite(unlist(st[-1]))))
+  if (nm == "three_shared") stopifnot(isTRUE(spec$shared_x), identical(df[[1]][1:30], df[[1]][31:60]))
+  if (nm == "three_unshared") {
+    stopifnot(identical(spec$shared_x, FALSE), identical(names(df), c("dose", "resp", "trt")),
+              !identical(df[[1]][1:30], df[[1]][31:60]))
+  }
+  if (nm == "offset_xlim") stopifnot(all(df[[1]] >= 100), all(df[[1]] <= 110))
+  if (startsWith(nm, "zero_error")) {
+    stopifnot(all(spec$s == 0), isTRUE(all.equal(df[[2]], df[[1]], tolerance = 1e-8)))
+  }
+  if (nm == "after_equation") stopifnot(all(spec$f[2, ] >= 0), isTRUE(all.equal(spec$f[2, 201], log(5))))
+}
+
+
 cat("JS OK (", length(files), " files checked, History, EchoGuard (+expiry), Tool queue, ",
     "Scatter (+offset range, R round trip), Boxplot (+ordering, R round trip), ",
-    "Histogram (+R round trip), Count (+R round trip), Density (+R round trip, Done flush), Bivariate (+R round trip, Done flush), Mosaic (+R round trip, Done flush), ",
+    "Histogram (+R round trip), Count (+R round trip), Density (+R round trip, Done flush), Bivariate (+R round trip, Done flush), Mosaic (+R round trip, Done flush), Regression (+R round trip, Done flush), ",
     "Done flush, Removal notices OK)\n",
     sep = "")

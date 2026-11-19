@@ -386,6 +386,63 @@ Start: `df <- dcr_scatter()` (groups A, B, C; x and y ranges 0 to 10).
 - [ ] Done via *Addins > DataCraftR > Mosaic (contingency table)* inserts 3
       lines; running them (`dcr_load()`) reproduces the same data.
 
+## Regression
+
+Run `dcr_regression()` (also with `groups = c("A", "B", "C")` for the group steps).
+
+- [ ] Sidebar: Edit (Curve | Error) and Mode (Pull | Paint) show icons next to
+      their labels (hover gives the label); Equation is collapsed, Error shape
+      and Data are open; every section title collapses and expands with a click
+      or Enter/Space. The canvas starts with the line y = x and a band of +-2.
+- [ ] Curve + Pull: press anywhere and drag up/down: the zone around the press
+      follows by exactly the distance you move (no jump when you press, also
+      far from the curve) and the ends are free to move. Curve + Paint: the
+      curve relaxes towards the cursor height while you move; ends included.
+      Both can leave the 0..1 region; the y axis refits when you let go.
+- [ ] Error + Pull: press above the curve and drag away from it: the band
+      widens; drag toward the curve: it narrows, never past zero. Pressing below
+      the curve works the same (away widens).
+- [ ] Error + Paint on a steep curve: apply the equation `x^2 / 10` (or draw a
+      steep curve), choose Error + Paint and sweep along the curve keeping the
+      cursor a fixed height above it: the band keeps the same width along the
+      whole curve (no smear to the sides).
+- [ ] Error shape: each icon (Constant, Cone, Reverse cone, Bowtie, Bulge)
+      replaces the band (one undo step each); the level slider re-applies the
+      last icon at the new level (one undo step per slider move, however long
+      the drag). After a hand error stroke, undo/redo or Clear the slider
+      instead scales the band proportionally. Fit to y refits the axis.
+- [ ] Equation: `sin(x)`, `exp(x/3)`, `x^2/10` buttons fill the field and apply
+      at once (one undo step); typing `2 + 0.5 * x` and Enter / Apply works;
+      with `log(x)` on 0..10 a warning says the equation is undefined for some
+      x and the curve uses the nearest values; `log(-1 - x)` and `x +` give an
+      error notification and change nothing; clearing the field does nothing
+      (no message). After changing the x range the equation is evaluated on the
+      new range.
+- [ ] x range: change it (e.g. 0..20, then 100..110): curves are resampled,
+      ends held beyond the old range, one undo step; invalid values (blank,
+      min >= max) give a notification and no change.
+- [ ] Show sample (off by default): tick it: n dots (at most 300 per group) sit
+      around the curve in the group colours with the label "Preview - Done
+      draws a new sample", and a Residuals vs fitted plot appears at the top
+      right; both follow the sculpting live; Resample redraws them. Untick: gone.
+- [ ] Groups: names "A, B, C" give three colours; keys 1-3 (or the buttons)
+      select the group; only the active group is edited and the others are faint;
+      renaming keeps curves; a new group starts as the initial line; removing
+      one shows "X removed - Ctrl+Z to undo". "Same x for all groups" is undoable.
+      n times groups over 1e6 is refused with a message in the canvas and the
+      sidebar goes back.
+- [ ] Rapid repeated clicks and drags in all four target/mode combinations,
+      also letting go outside the plot: it never freezes and a click or a wiggle
+      under 3 px adds no undo step. One drag = one undo step.
+- [ ] Edit then Done: type a new n, x range or names and click Done without
+      leaving the field; the returned data has them.
+- [ ] `dcr_regression()` then Done returns a data frame with n rows (columns x,
+      y, group); with `groups = c("A", "B")` it returns 2 n rows, and with shared
+      x the x values repeat for each group. The stats table shows one row per
+      group (mean, sd, r, r2_curve).
+- [ ] Done via *Addins > DataCraftR > Regression curve* inserts 3 lines;
+      running them (`dcr_load()`) reproduces the same data.
+
 ## RStudio integration
 
 Run these in RStudio itself (they cannot be checked from the console tests).

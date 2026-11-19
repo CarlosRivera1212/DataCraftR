@@ -169,3 +169,9 @@ test_that("the sidebar defaults: Show sample off, spec example buttons", {
   expect_match(html, 'aria-label="Pull"', fixed = TRUE)
   expect_match(html, 'aria-label="Error"', fixed = TRUE)
 })
+
+test_that("the regression UI loads its tool script", {
+  html <- htmltools::renderTags(dcr_gadget_ui(regression_tool()))
+  deps <- vapply(html$dependencies, function(d) paste(d$script, collapse = " "), "")
+  expect_true(any(grepl("tools/regression.js", deps, fixed = TRUE)))
+})
