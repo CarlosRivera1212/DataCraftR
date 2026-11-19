@@ -1,3 +1,8 @@
+# DataCraftR 0.5.2
+
+* New tool `dcr_bivariate()`: shape bivariate normal populations as ellipses
+  (Handles / Gestures), up to 10 groups, exact sampling of n rows per group.
+
 # DataCraftR 0.5.1
 
 * New tool `dcr_density()`: sculpt smooth density curves (Pull / Paint brush

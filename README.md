@@ -1,7 +1,7 @@
 # DataCraftR <img src="man/figures/logo.png" align="right" height="138" alt="" />
 
 **DataCraftR** turns a drawing into a data set. Sketch a scatter plot, a
-histogram, a smooth density curve, a boxplot or a set of count bars in an
+histogram, a smooth density curve, a bivariate normal ellipse, a boxplot or a set of count bars in an
 interactive gadget, press **Done**, and get a `data.frame` back, together with
 a reproducible specification that regenerates the same data.
 
@@ -31,6 +31,7 @@ remotes::install_github("CarlosRivera1212/DataCraftR")
 | `dcr_boxplot()` | Q1, median and Q3 of one box per variable | A random sample matching those quartiles | `variables`, `n`, `family` (`"normal"`/`"uniform"`), `ylim` |
 | `dcr_histogram()` | Bar heights for one histogram per variable | A random sample from that population | `variables`, `n`, `xlim`, `nbins` |
 | `dcr_density()` | A smooth density curve per variable (soft Pull / Paint brush) | A random sample from that distribution | `variables`, `n`, `xlim` |
+| `dcr_bivariate()` | One ellipse per group (Handles / Gestures) | A random sample from that bivariate normal: `x`, `y`, `group` | `groups`, `n`, `xlim`, `ylim`, `names` |
 | `dcr_count()` | Integer counts for every variable and category | Exactly those counts, one row per observation (`variable`, `category`) | `variables`, `categories`, `ymax` |
 
 ## Two ways to use them
@@ -54,7 +55,7 @@ df <- dcr_load("scatter_20261117_153012")
 # write.csv(df, "scatter.csv", row.names = FALSE)   # save into your project
 ```
 
-For boxplots, histograms and density curves the line also carries the seed, for example
+For boxplots, histograms, density curves and bivariate ellipses the line also carries the seed, for example
 `dcr_load("boxplot_20261117_153012", seed = 42)`.
 
 ## Reproducibility
@@ -80,8 +81,6 @@ dcr_delete("boxplot_20261117_153012")
 
 In DataCraftR:
 
-- bivariate normal
-- correlation matrix
 - proportions / contingency tables
 - radar
 - regression curve
