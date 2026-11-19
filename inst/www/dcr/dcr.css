@@ -156,3 +156,7 @@ body { background: var(--dcr-panel); color: var(--dcr-ink); overflow: hidden; }
   border-radius: var(--dcr-radius); pointer-events: none;
 }
 .dcr-regmini svg { display: block; }
+
+.dcr-range-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; align-items: center; margin-bottom: 4px; }
+.dcr-range-row .form-control { min-width: 0; }
+.dcr-range-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
