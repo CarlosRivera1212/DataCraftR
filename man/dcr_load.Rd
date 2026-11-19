@@ -21,8 +21,8 @@ Tools used from the RStudio Addins menu save their spec in the user data
 directory (\code{tools::R_user_dir("DataCraftR", "data")}) and insert
 \code{df <- dcr_load("<id>")} into your script. Literal tools (scatter, count,
 mosaic) return exactly what was drawn. Population tools (boxplot, histogram,
-density, bivariate) re-sample using the stored seed, so the same data comes
-back, unless you give a different \code{seed}.
+density, bivariate, regression) re-sample using the stored seed, so the same
+data comes back, unless you give a different \code{seed}.
 }
 \examples{
 if (FALSE) {

@@ -1,3 +1,11 @@
+# DataCraftR 0.5.4
+
+* New tool `dcr_regression()`: draw a regression curve and its error band
+  (sculpt both, start from an R equation, error-shape presets for
+  heteroscedasticity), with a sample preview and residual plot.
+* Tool validators now receive the current control values and can raise
+  non-blocking notices.
+
 # DataCraftR 0.5.3
 
 * New tool `dcr_mosaic()`: draw an exact two-way contingency table as a mosaic
