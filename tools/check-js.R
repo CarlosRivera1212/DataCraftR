@@ -1117,6 +1117,7 @@ run_check("Density strokes", engine("density"), paste0(dn_script, "
       stroke(t, [[50, 50], [51, 51], [52, 50], [50, 52]]);
     });
     ok.push(t.history._index === depth);
+    t.ui.mode = 'pull';                                     // paint's first crossing frame has dt = 0
     stroke(t, [[50, 50], [50, 53]]);                       // 3 px: a real drag
     ok.push(t.history._index === depth + 1);
     t.ui.mode = 'paint';

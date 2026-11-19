@@ -371,6 +371,7 @@
       if (st && ev.pointerId === st.id && !st.moved &&
           Math.hypot(ev.clientX - st.cx, ev.clientY - st.cy) >= DEAD_ZONE) {
         st.moved = true;
+        st.last = now();
       }
       if (st && ev.pointerId === st.id && st.moved) {
         var s = this.state, xs = grid(s.xlim, s.curves[st.i].length), t = now();

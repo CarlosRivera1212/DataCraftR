@@ -54,7 +54,7 @@ df <- dcr_load("scatter_20261117_153012")
 # write.csv(df, "scatter.csv", row.names = FALSE)   # save into your project
 ```
 
-For boxplots and histograms the line also carries the seed, for example
+For boxplots, histograms and density curves the line also carries the seed, for example
 `dcr_load("boxplot_20261117_153012", seed = 42)`.
 
 ## Reproducibility
