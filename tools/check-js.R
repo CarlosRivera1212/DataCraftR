@@ -1237,8 +1237,439 @@ run_check("Density Done flush", engine(c("density")), paste0(flush_script, "
   })()
 "))
 
+# Bivariate: geometry conversions, Handles mode, stroke hardening, autofit,
+# limits, groups, and toSpec() accepted by R.
+bv_script <- "
+  function mk(groups, o) {
+    var opts = {groups: groups, n: 200, xlim: [0, 10], ylim: [0, 10]};
+    for (var k in (o || {})) opts[k] = o[k];
+    var t = new DCR.tools.bivariate({clientWidth: 0, clientHeight: 0,
+      getBoundingClientRect: function () { return {left: 0, top: 0}; }}, opts);
+    // fake 100 x 100 px plot: 1 px = 0.1 data unit for the default limits
+    t._geo = {left: 0, top: 0, width: 100, height: 100, k: 10};
+    t._dom = {svg: {setPointerCapture: function () {}}};
+    t.render = function () {};
+    t._flash = function (m) { t._flashed = (t._flashed || []).concat([m]); };
+    return t;
+  }
+  function px(t, x, y) {      // data -> client px with the fake geometry
+    var L = t._geo, s = t.state;
+    return [L.left + (x - s.xlim[0]) * L.k, L.top + L.height - (y - s.ylim[0]) * L.k];
+  }
+  function stroke(t, pts) {
+    t._pointerDown({button: 0, pointerId: 1, clientX: pts[0][0], clientY: pts[0][1]});
+    pts.slice(1).forEach(function (p) {
+      t._pointerMove({pointerId: 1, clientX: p[0], clientY: p[1]});
+    });
+    t._pointerUp({pointerId: 1}); t.endStroke();
+  }
+  function near(a, b, e) { return Math.abs(a - b) < (e || 1e-9); }
+  function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+  function copyOf(x) { return JSON.parse(JSON.stringify(x)); }
+  function B() { return DCR.tools.bivariate; }
+  function finite(t) {
+    return t.state.ell.every(function (e) {
+      return [e.mx, e.my, e.s1, e.s2, e.th].every(isFinite) && e.s1 > 0 && e.s2 > 0;
+    });
+  }
+  function handle(t, which) {
+    var e = t.state.ell[t.activeIndex()], h = t._handles(e);
+    return px(t, h[which].x, h[which].y);
+  }
+  function centre(t) {
+    var e = t.state.ell[t.activeIndex()];
+    return px(t, e.mx, e.my);
+  }
+"
+run_check("Bivariate geometry", engine("bivariate"), paste0(bv_script, "
+  (function () {
+    var ok = [];
+    // marginal <-> ellipse: circle, elongated, all rho
+    var cases = [];
+    [-0.9, -0.5, 0, 0.5, 0.9].forEach(function (r) {
+      cases.push({mean_x: 1, mean_y: -2, sd_x: 1, sd_y: 1, rho: r});
+      cases.push({mean_x: 3, mean_y: 4, sd_x: 10, sd_y: 1, rho: r});
+      cases.push({mean_x: 3, mean_y: 4, sd_x: 0.5, sd_y: 2, rho: r});
+    });
+    var good = true;
+    cases.forEach(function (m) {
+      var e = B().fromMarginal(m), m2 = B().toMarginal(e);
+      ['mean_x', 'mean_y', 'sd_x', 'sd_y', 'rho'].forEach(function (k) {
+        if (!near(m[k], m2[k]) || !isFinite(m2[k])) good = false;
+      });
+      if (!(e.s1 >= e.s2 && e.s2 > 0)) good = false;
+    });
+    ok.push(good);
+    // ellipse -> marginal -> ellipse: same marginals for any angle
+    good = true;
+    [0, Math.PI / 2, -Math.PI / 2, Math.PI, 3, 100].forEach(function (th) {
+      [[2, 1], [1, 1], [5, 0.01]].forEach(function (s) {
+        var e = {mx: 1, my: 2, s1: s[0], s2: s[1], th: th};
+        var m = B().toMarginal(e), m2 = B().toMarginal(B().fromMarginal(m));
+        ['mean_x', 'mean_y', 'sd_x', 'sd_y', 'rho'].forEach(function (k) {
+          if (!near(m[k], m2[k], 1e-9) || !isFinite(m2[k])) good = false;
+        });
+      });
+    });
+    ok.push(good);
+    // |rho| is clamped
+    ok.push(B().toMarginal({mx: 0, my: 0, s1: 100, s2: 0.001, th: 0.7}).rho === 0.999 &&
+            B().fromMarginal({mean_x: 0, mean_y: 0, sd_x: 1, sd_y: 1, rho: 5}).s2 > 0);
+    // initial layout
+    var one = B().initial(['A'], [0, 10], [0, 10]);
+    ok.push(one.length === 1 && near(one[0].mx, 5) && near(one[0].my, 5) &&
+            near(B().toMarginal(one[0]).sd_x, 1) && near(B().toMarginal(one[0]).rho, 0.5));
+    var three = B().initial(['A', 'B', 'C'], [0, 20], [0, 10]);   // m = 10, centre (10, 5)
+    ok.push(three.length === 3 &&
+            three.every(function (e) { return near(Math.hypot(e.mx - 10, e.my - 5), 2.5); }) &&
+            near(three[0].mx, 10) && near(three[0].my, 7.5) &&         // first at the top
+            three[1].mx > 10 && three[1].my < 5 &&                     // clockwise: right, below
+            three[2].mx < 10 && three[2].my < 5 &&
+            three.every(function (e) { return near(B().toMarginal(e).sd_x, 1) && near(B().toMarginal(e).sd_y, 1); }) &&
+            [0, 1, 2].every(function (i) { return near(B().toMarginal(three[i]).rho, [0.5, -0.5, 0][i]); }));
+    // fitLimits: never shrinks, rounds only moved ends outward
+    ok.push(B().fitLimits([0, 10], 2, 8).join() === '0,10' &&
+            B().fitLimits([0, 10], -1.3, 8).join() === '-5,10' &&
+            B().fitLimits([0, 10], 2, 10.2).join() === '0,15' &&
+            B().fitLimits([0, 10], NaN, 12).join() === '0,15' &&
+            B().fitLimits([1000, 1010], 995.5, 1010)[0] <= 995.5);
+    // contains
+    var e1 = B().initial(['A'], [0, 10], [0, 10]);
+    ok.push(B().contains([0, 10], [0, 10], e1) && !B().contains([5, 10], [0, 10], e1) &&
+            B().contains([-100, 100], [-100, 100], e1));
+    return ok.join(',');
+  })()
+"))
+
+run_check("Bivariate handles", engine("bivariate"), paste0(bv_script, "
+  (function () {
+    var ok = [], t, d0, e, h, c, r, a, a0, pts, k, i, th0, s10, s20, th1;
+    // centre drag: move, one entry, undo restores
+    t = mk(['A']); d0 = t.history._index;
+    stroke(t, [[50, 50], [60, 40], [70, 30]]);
+    ok.push(near(t.state.ell[0].mx, 7) && near(t.state.ell[0].my, 7) &&
+            t.history._index === d0 + 1);
+    t.undo();
+    ok.push(near(t.state.ell[0].mx, 5) && near(t.state.ell[0].my, 5));
+    // the mean is clamped to the view
+    t = mk(['A']); t.ui.autofit = false; stroke(t, [[50, 50], [200, -50]]);
+    ok.push(near(t.state.ell[0].mx, 10) && near(t.state.ell[0].my, 10));
+
+    // major handle: +90 degrees around the centre rotates th by +90, s1 unchanged
+    t = mk(['A']); e = t.state.ell[0]; th0 = e.th; s10 = e.s1; s20 = e.s2;
+    h = handle(t, 'major'); c = centre(t);
+    r = Math.hypot(h[0] - c[0], h[1] - c[1]);
+    a0 = Math.atan2(-(h[1] - c[1]), h[0] - c[0]); pts = [[h[0], h[1]]];
+    for (k = 1; k <= 18; k++) {
+      a = a0 + k * (Math.PI / 2) / 18;
+      pts.push([c[0] + r * Math.cos(a), c[1] - r * Math.sin(a)]);
+    }
+    stroke(t, pts);
+    e = t.state.ell[0];
+    ok.push(near(e.th, th0 + Math.PI / 2, 1e-6) && near(e.s1, s10, 1e-6) && near(e.s2, s20));
+    // no jump at the grab: press off the handle centre (inside the hit radius),
+    // move outward along the same ray: th is kept (only the angular delta counts)
+    t = mk(['A']); e = t.state.ell[0]; th0 = e.th;
+    h = handle(t, 'major'); c = centre(t);
+    var gx = h[0] + 1.5, gy = h[1] + 1.5;
+    var ga = Math.atan2(-(gy - c[1]), gx - c[0]);
+    stroke(t, [[gx, gy], [gx + 4 * Math.cos(ga), gy - 4 * Math.sin(ga)]]);
+    ok.push(near(t.state.ell[0].th, th0, 1e-9) && t.state.ell[0].s1 > s10);
+    // rotation through +-180 never flips an axis: s1 stays, th accumulates 450 degrees
+    t = mk(['A']); e = t.state.ell[0]; h = handle(t, 'major'); c = centre(t);
+    r = Math.hypot(h[0] - c[0], h[1] - c[1]); a0 = Math.atan2(-(h[1] - c[1]), h[0] - c[0]);
+    pts = [[h[0], h[1]]];
+    for (k = 1; k <= 40; k++) {
+      a = a0 + k * (2 * Math.PI * 1.25) / 40;
+      pts.push([c[0] + r * Math.cos(a), c[1] - r * Math.sin(a)]);
+    }
+    th0 = e.th; stroke(t, pts);
+    e = t.state.ell[0];
+    ok.push(near(e.th, th0 + 2.5 * Math.PI, 1e-6) && near(e.s1, s10, 1e-6) && finite(t));
+
+    // minor handle: s2 changes, th and s1 do not
+    t = mk(['A']); e = t.state.ell[0]; th1 = e.th;
+    h = handle(t, 'minor'); c = centre(t);
+    var dir = [h[0] - c[0], h[1] - c[1]], len = Math.hypot(dir[0], dir[1]);
+    stroke(t, [[h[0], h[1]], [h[0] + dir[0] / len * 10, h[1] + dir[1] / len * 10]]);
+    e = t.state.ell[0];
+    ok.push(near(e.s2, s20 + 1, 1e-6) && near(e.th, th1) && near(e.s1, s10));
+    // through the centre exactly: the minimum, never <= 0; s1 and th unchanged
+    t = mk(['A']); h = handle(t, 'minor'); c = centre(t);
+    stroke(t, [[h[0], h[1]], [c[0], c[1]]]);
+    e = t.state.ell[0];
+    ok.push(e.s2 === 0.05 && near(e.s1, s10) && near(e.th, th1));
+    // and past it: mirrored (|projection|), still not swapped
+    t = mk(['A']); h = handle(t, 'minor'); c = centre(t);
+    stroke(t, [[h[0], h[1]], [c[0], c[1]], [2 * c[0] - h[0], 2 * c[1] - h[1]]]);
+    e = t.state.ell[0];
+    ok.push(near(e.s2, s20, 1e-6) && near(e.s1, s10) && near(e.th, th1) && e.s2 > 0);
+    // huge pull: clamped to SMAX (10 x the larger range)
+    t = mk(['A']); h = handle(t, 'major'); stroke(t, [[h[0], h[1]], [h[0] + 1e7, h[1]]]);
+    ok.push(near(t.state.ell[0].s1, 100) && finite(t));
+    // near-circular ellipse: many rotations through the centre stay finite
+    t = mk(['A']); t.state.ell[0] = {mx: 5, my: 5, s1: 1, s2: 1, th: 0}; t.commit(t.state);
+    for (i = 0; i < 30; i++) {
+      h = handle(t, 'major'); c = centre(t);
+      stroke(t, [[h[0], h[1]], [c[0] + 15, c[1] + 9 * (i % 3)], [c[0], c[1]], [c[0] - 20, c[1] - 7]]);
+    }
+    ok.push(finite(t) && isFinite(B().toMarginal(t.state.ell[0]).rho));
+    return ok.join(',');
+  })()
+"))
+
+run_check("Bivariate strokes", engine("bivariate"), paste0(bv_script, "
+  (function () {
+    var ok = [], t, d0, i, h, c, e, q;
+    // 200 rapid clicks on the centre, both handles and empty canvas: no history, no freeze
+    t = mk(['A', 'B']); d0 = t.history._index;
+    var targets = [centre(t), handle(t, 'major'), handle(t, 'minor'), [3, 97], [99, 1]];
+    for (i = 0; i < 200; i++) {
+      q = targets[i % targets.length];
+      t._pointerDown({button: 0, pointerId: 1, clientX: q[0], clientY: q[1]});
+      if (i % 3 === 0) t._pointerMove({pointerId: 1, clientX: q[0] + 1, clientY: q[1] - 1});
+      t._pointerUp({pointerId: 1}); t.endStroke();
+    }
+    ok.push(t.history._index === d0 && !t._busy && !t._stroke && finite(t));
+    // 3 px is a real drag; 2.9 px is not
+    h = handle(t, 'major');
+    stroke(t, [[h[0], h[1]], [h[0] + 2.9, h[1]]]);
+    ok.push(t.history._index === d0);
+    c = centre(t);
+    stroke(t, [[c[0], c[1]], [c[0] + 3, c[1]]]);
+    ok.push(t.history._index === d0 + 1);
+    // a real drag is one entry, undo restores
+    t = mk(['A']); d0 = t.history._index; e = copyOf(t.state.ell[0]);
+    h = handle(t, 'major');
+    stroke(t, [[h[0], h[1]], [h[0] + 10, h[1] + 5], [h[0] + 20, h[1] - 8], [h[0] + 15, h[1]]]);
+    ok.push(t.history._index === d0 + 1 && !same(t.state.ell[0], e));
+    t.undo();
+    ok.push(same(t.state.ell[0], e));
+    // stale stroke (no end event) recovers on the next press
+    t = mk(['A']); d0 = t.history._index; c = centre(t);
+    t._pointerDown({button: 0, pointerId: 1, clientX: c[0], clientY: c[1]});
+    t._pointerMove({pointerId: 1, clientX: c[0] + 20, clientY: c[1]});
+    ok.push(t._busy === true);
+    c = centre(t);
+    stroke(t, [[c[0], c[1]], [c[0], c[1] + 20]]);
+    ok.push(!t._busy && !t._stroke && t.history._index === d0 + 2 && finite(t));
+    c = centre(t);
+    t._pointerDown({button: 0, pointerId: 7, clientX: c[0], clientY: c[1]});
+    t._pointerDown({button: 0, pointerId: 8, clientX: c[0], clientY: c[1]});   // no hasPointerCapture: stale
+    ok.push(t._stroke && t._stroke.id === 8);
+    t._pointerUp({pointerId: 8}); t.endStroke();
+    // a different pointer that is still captured is ignored
+    t._dom.svg.hasPointerCapture = function () { return true; };
+    t._pointerDown({button: 0, pointerId: 1, clientX: c[0], clientY: c[1]});
+    t._pointerDown({button: 0, pointerId: 2, clientX: c[0], clientY: c[1]});
+    ok.push(t._stroke.id === 1);
+    t._pointerUp({pointerId: 1}); t.endStroke();
+    t._dom.svg.hasPointerCapture = undefined;
+    // a throwing commit never leaves the engine busy
+    t = mk(['A']); t.setControl('n', 5);
+    var real = t.commit, threw = false;
+    t.commit = function () { throw new Error('boom'); };
+    c = centre(t);
+    t._pointerDown({button: 0, pointerId: 1, clientX: c[0], clientY: c[1]});
+    t._pointerMove({pointerId: 1, clientX: c[0] + 30, clientY: c[1]});
+    try { t._pointerUp({pointerId: 1}); } catch (err) { threw = true; }
+    t.commit = real;
+    ok.push(threw && !t._busy && !t._stroke);
+    t.undo(); ok.push(t.state.n === 200);
+    // clicking another group's interior selects it without history
+    t = mk(['A', 'B']); d0 = t.history._index;
+    var b = t.state.ell[1], pb = px(t, b.mx, b.my);
+    t._pointerDown({button: 0, pointerId: 1, clientX: pb[0], clientY: pb[1]});
+    t._pointerUp({pointerId: 1}); t.endStroke();
+    ok.push(t.ui.active === 1 && t.history._index === d0 && !t._busy && !t._stroke);
+    t.action('select-1'); ok.push(t.ui.active === 0);
+    // controls queued during a stroke apply after it, as separate entries
+    t = mk(['A']); d0 = t.history._index; c = centre(t);
+    t._pointerDown({button: 0, pointerId: 1, clientX: c[0], clientY: c[1]});
+    t._pointerMove({pointerId: 1, clientX: c[0] + 20, clientY: c[1]});
+    t.receiveControl('n', 300);
+    ok.push(t.state.n === 200);
+    t._pointerUp({pointerId: 1}); t.endStroke();
+    ok.push(t.state.n === 300 && t.history._index === d0 + 2);
+    return ok.join(',');
+  })()
+"))
+
+run_check("Bivariate axes", engine("bivariate"), paste0(bv_script, "
+  (function () {
+    var ok = [], t, d0, s, c;
+    // autofit: dragging a centre to the view edge grows the limits (only grows), one entry
+    t = mk(['A']); d0 = t.history._index;
+    stroke(t, [[50, 50], [100, 50]]);
+    s = t.state;
+    ok.push(t.history._index === d0 + 1 && s.xlim[0] <= 0 && s.xlim[1] > 10 && s.ylim.join() === '0,10' &&
+            B().contains(s.xlim, s.ylim, s.ell));
+    t.undo();
+    ok.push(t.state.xlim.join() === '0,10' && near(t.state.ell[0].mx, 5) && t.history._index === d0);
+    // a stroke that stays inside leaves the limits alone
+    t = mk(['A']); stroke(t, [[50, 50], [55, 50]]);
+    ok.push(t.state.xlim.join() === '0,10' && t.state.ylim.join() === '0,10');
+    // autofit off: limits stay
+    t = mk(['A']); t.setControl('autofit', false); d0 = t.history._index;
+    stroke(t, [[50, 50], [100, 50]]);
+    ok.push(t.state.xlim.join() === '0,10' && near(t.state.ell[0].mx, 10) && t.history._index === d0 + 1);
+
+    // sidebar limits that hide a group: expand to hold every 2-sigma box + notice, one entry
+    t = mk(['A', 'B']); d0 = t.history._index;
+    t.receiveControl('xlim', [50, 60]);
+    s = t.state;
+    ok.push(t.history._index === d0 + 1 && B().contains(s.xlim, s.ylim, s.ell) &&
+            s.xlim[1] === 60 && t._flashed && t._flashed.length === 1 &&
+            t._flashed[0] === 'Axes expanded to keep every group in view');
+    // limits that keep every mean: plain entry, no flash; unchanged is a no-op
+    t = mk(['A', 'B']); t.receiveControl('xlim', [-20, 20]);
+    ok.push(t.state.xlim.join() === '-20,20' && !t._flashed && t.history._index === 1);
+    t.receiveControl('xlim', [-20, 20]);
+    ok.push(t.history._index === 1);
+    // reset-axes: back to lim0 with no flash when every mean is inside
+    t = mk(['A']); t.receiveControl('xlim', [-20, 20]); t.receiveControl('ylim', [-3, 30]);
+    t.action('reset-axes');
+    ok.push(t.state.xlim.join() === '0,10' && t.state.ylim.join() === '0,10' && !t._flashed);
+    // ... and expanded (with the notice) when a mean lies outside lim0
+    t = mk(['A']); stroke(t, [[50, 50], [100, 50]]);
+    c = centre(t); stroke(t, [[c[0], c[1]], [140, c[1]]]);          // mean now beyond x = 10
+    ok.push(t.state.ell[0].mx > 10);
+    t.action('reset-axes');
+    ok.push(B().contains(t.state.xlim, t.state.ylim, t.state.ell) && t.state.xlim[1] > 10 &&
+            t._flashed && t._flashed.length === 1);
+    // offset axes: initial layout in the middle of the range
+    t = mk(['A'], {xlim: [1000, 1010], ylim: [-5, 5]});
+    ok.push(near(t.state.ell[0].mx, 1005) && near(t.state.ell[0].my, 0) &&
+            near(t.toSpec().sd_x[0], 1));
+    return ok.join(',');
+  })()
+"))
+
+run_check("Bivariate groups and controls", engine("bivariate"), paste0(bv_script, "
+  (function () {
+    var ok = [], t, d0, m, c;
+    // rename B -> Z keeps the ellipse
+    t = mk(['A', 'B']); t.state.ell[1].mx = 8; t.commit(t.state);
+    var eB = JSON.stringify(t.state.ell[1]);
+    t.receiveControl('groups', 'A, Z');
+    ok.push(t.state.groups.join() === 'A,Z' && JSON.stringify(t.state.ell[1]) === eB && !t._flashed);
+    // add D: centred, sd = 0.1 m, rho 0; others keep theirs
+    t = mk(['A', 'B']); t.state.ell[0].mx = 2; t.commit(t.state);
+    var eA = JSON.stringify(t.state.ell[0]);
+    t.receiveControl('groups', 'A, B, D');
+    m = B().toMarginal(t.state.ell[2]);
+    ok.push(t.state.groups.length === 3 && JSON.stringify(t.state.ell[0]) === eA &&
+            near(m.mean_x, 5) && near(m.mean_y, 5) && near(m.sd_x, 1) && near(m.sd_y, 1) && near(m.rho, 0));
+    // remove A: notice, B keeps its ellipse, one entry, undo brings A back
+    t = mk(['A', 'B']); var eB2 = JSON.stringify(t.state.ell[1]); d0 = t.history._index;
+    t.receiveControl('groups', 'B');
+    ok.push(t.state.groups.join() === 'B' && JSON.stringify(t.state.ell[0]) === eB2 &&
+            t._flashed.length === 1 && /A removed/.test(t._flashed[0]) && t.history._index === d0 + 1);
+    t.undo(); ok.push(t.state.groups.join() === 'A,B' && t.state.ell.length === 2);
+    // Clear restores the initial layout (undoable); no entry when already initial
+    t = mk(['A', 'B', 'C']); d0 = t.history._index;
+    t.clear(); ok.push(t.history._index === d0);
+    c = centre(t); stroke(t, [[c[0], c[1]], [10, 10]]);
+    var moved = JSON.stringify(t.state.ell);
+    t.clear();
+    ok.push(JSON.stringify(t.state.ell) === JSON.stringify(B().initial(['A', 'B', 'C'], t.state.xlim, t.state.ylim)) &&
+            t.history._index > d0);
+    t.undo(); ok.push(JSON.stringify(t.state.ell) === moved);
+    // n and names: one entry each; invalid values (and n x groups > 1e6) are ignored
+    t = mk(['A', 'B']); d0 = t.history._index;
+    t.receiveControl('n', 500); t.receiveControl('n', 500);
+    t.receiveControl('names', {x: ' h ', y: 'w', group: 'g'});
+    t.receiveControl('n', 0); t.receiveControl('n', 600000); t.receiveControl('n', 2.5);
+    t.receiveControl('names', {x: 'a', y: 'a', group: 'g'});
+    t.receiveControl('xlim', [5, 5]); t.receiveControl('ylim', ['', 3]); t.receiveControl('groups', 'A, A');
+    ok.push(t.state.n === 500 && t.state.names.x === 'h' && t.history._index === d0 + 2 &&
+            t.state.xlim.join() === '0,10');
+    // mode / autofit / active are settings, not history entries
+    t.receiveControl('mode', 'gestures'); t.receiveControl('mode', 'bogus');
+    t.receiveControl('autofit', false); t.receiveControl('autofit', 'yes');
+    t.receiveControl('active', '2'); t.receiveControl('active', '9');
+    ok.push(t.ui.mode === 'gestures' && t.ui.autofit === false && t.ui.active === 1 &&
+            t.history._index === d0 + 2);
+    ok.push(mk(['A'], {mode: 'zzz'}).ui.mode === 'handles' && mk(['A']).ui.autofit === true &&
+            mk(['A'], {autofit: false}).ui.autofit === false);
+    // one group arrives from R as a scalar; names are trimmed
+    t = mk(' solo ');
+    ok.push(t.state.groups.join() === 'solo' && t.state.ell.length === 1);
+    // select-k keys 1-9
+    t = mk(['A', 'B', 'C']); t.action('select-3'); t.action('select-9');
+    ok.push(t.ui.active === 2);
+    return ok.join(',');
+  })()
+"))
+
+# Bivariate: toSpec() JSON from V8 is accepted by R and matches toMarginal().
+bv_json <- function(setup) {
+  cx <- engine("bivariate")
+  cx$eval(paste0(bv_script, "var T = (function () {", setup, "})();"))
+  cx$eval("JSON.stringify(T.toSpec())")
+}
+bv_cases <- list(
+  one_group = "var t = mk(['A']); stroke(t, [[50, 50], [60, 40]]); return t;",
+  three_groups = "var t = mk(['A', 'B', 'C']); var h = handle(t, 'major');
+    stroke(t, [[h[0], h[1]], [h[0] + 12, h[1] + 3]]); t.action('select-2');
+    h = handle(t, 'minor'); stroke(t, [[h[0], h[1]], [h[0] + 6, h[1] - 6]]); return t;",
+  offset_axes = "var t = mk(['A', 'B'], {xlim: [1000, 1010], ylim: [-5, 5]});
+    var c = centre(t); stroke(t, [[c[0], c[1]], [c[0] + 8, c[1] + 8]]); return t;",
+  rho_max = "var t = mk(['A']); t.state.ell[0] = {mx: 5, my: 5, s1: 4, s2: 0.0001, th: 0.4};
+    t.commit(t.state); return t;",
+  custom_names = "var t = mk(['g1', 'g2']); t.receiveControl('names', {x: 'height', y: 'weight', group: 'sp'});
+    t.receiveControl('n', 77); return t;"
+)
+for (nm in names(bv_cases)) {
+  js <- bv_json(bv_cases[[nm]])
+  raw <- jsonlite::fromJSON(js)
+  spec <- tryCatch(as_dcr_spec(raw), error = function(e) {
+    message("Bivariate round trip failed (", nm, "): ", conditionMessage(e))
+    quit(status = 1)
+  })
+  k <- length(spec$groups)
+  stopifnot(inherits(spec, "dcr_spec"), k == length(raw$groups),
+            isTRUE(all.equal(spec$mean_x, raw$mean_x, tolerance = 1e-9)),
+            isTRUE(all.equal(spec$mean_y, raw$mean_y, tolerance = 1e-9)),
+            isTRUE(all.equal(spec$sd_x, raw$sd_x, tolerance = 1e-9)),
+            isTRUE(all.equal(spec$sd_y, raw$sd_y, tolerance = 1e-9)),
+            isTRUE(all.equal(spec$rho, raw$rho, tolerance = 1e-9)),
+            all(spec$sd_x > 0), all(spec$sd_y > 0), all(abs(spec$rho) <= 0.999))
+  if (nm == "rho_max") stopifnot(abs(spec$rho) == 0.999)
+  if (nm == "offset_axes") stopifnot(spec$xlim[1] <= 1000, spec$ylim[2] >= 5)
+  if (nm == "custom_names") {
+    stopifnot(spec$n == 77, identical(spec$names$x, "height"),
+              identical(spec$names$group, "sp"))
+  }
+  df <- sample_spec(spec, 20)
+  stopifnot(nrow(df) == 20L * k, all(is.finite(df[[1]])), all(is.finite(df[[2]])))
+  stats <- spec_stats(spec)
+  stopifnot(nrow(stats) == k + 1L, all(is.finite(unlist(stats[-1]))))
+  df2 <- dcr_sample(spec, seed = 1)
+  stopifnot(nrow(df2) == spec$n * k)
+}
+
+# Bivariate: Done flushes the sidebar (groups / n / limits / names / mode / autofit).
+run_check("Bivariate Done flush", engine(c("bivariate")), paste0(flush_script, "
+  (function () {
+    var d = new DCR.tools.bivariate(el(), {groups: ['V1', 'V2', 'V3']});
+    d._flash = function () {};
+    sidebar = {active: '1', groups: 'V1, V2', mode: 'gestures', autofit: false, n: 250,
+               xlim: [0, 20], ylim: [-5, 5], names: {x: 'h', y: 'w', group: 'g'}};
+    var s = doneSpec(d);
+    return [s !== null && s.n === 250 && s.groups.join() === 'V1,V2' && s.xlim[1] === 20 &&
+            s.ylim[0] === -5 && s.names.x === 'h' && s.mean_x.length === 2 &&
+            d.ui.mode === 'gestures' && d.ui.autofit === false,
+            (function () {
+              sidebar = {groups: 'A, A', xlim: ['', 3], n: 0, mode: 'x', autofit: 'maybe'};
+              var s2 = doneSpec(d);
+              return s2 !== null && s2.groups.join() === 'V1,V2' && s2.n === 250;
+            })()].join(',');
+  })()
+"))
+
 cat("JS OK (", length(files), " files checked, History, EchoGuard (+expiry), Tool queue, ",
     "Scatter (+offset range, R round trip), Boxplot (+ordering, R round trip), ",
-    "Histogram (+R round trip), Count (+R round trip), Density (+R round trip, Done flush), ",
+    "Histogram (+R round trip), Count (+R round trip), Density (+R round trip, Done flush), Bivariate (+R round trip, Done flush), ",
     "Done flush, Removal notices OK)\n",
     sep = "")

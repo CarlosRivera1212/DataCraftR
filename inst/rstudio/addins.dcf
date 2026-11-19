@@ -22,3 +22,8 @@ Name: Density
 Description: Density Curve Data Generator
 Binding: dcr_density_addin
 Interactive: true
+
+Name: Bivariate normal
+Description: Draw bivariate normal populations and insert code to sample them
+Binding: dcr_bivariate_addin
+Interactive: true

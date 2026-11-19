@@ -225,6 +225,58 @@ Start: `df <- dcr_scatter()` (groups A, B, C; x and y ranges 0 to 10).
       data.
 - [ ] Cancel (button and `Esc` outside a field) returns `NULL`.
 
+## Bivariate
+
+- [ ] Open `dcr_bivariate()`: two groups (A top, B below right of the centre),
+      each a solid 1-sigma and a lighter 2-sigma ellipse in its palette colour;
+      the active group (A) shows a centre dot, a major handle and a minor
+      handle joined to the centre by dashed lines. Axes 0 to 10 with equal
+      pixels per unit, titles "x" and "y". The stats table shows the means,
+      sds and r of each group and of "All".
+- [ ] Handles feel: drag the centre (the ellipse follows, the mean stops at the
+      plot edge); drag the major handle outwards and inwards (sd along the axis
+      changes, the other does not); drag the minor handle both ways; rotate by
+      dragging the major handle round the centre, past 180 degrees and several
+      turns, with no jump at the grab and no flip of the axes. Pulling a handle
+      through the centre never gives a zero or negative sd (it stops at a tiny
+      minimum and mirrors past it).
+- [ ] Click inside another group's 2-sigma ellipse: it becomes the active group
+      (sidebar buttons follow) and nothing is added to the undo history.
+      Keys `1`-`2` do the same.
+- [ ] One drag = one undo step; `Ctrl+Z` undoes the whole drag (axes growth
+      included), `Ctrl+Shift+Z` redoes it.
+- [ ] Rapid repeated clicks and drags never freeze: click 50 times quickly on
+      the centre, on each handle, on the ring and on empty canvas (clicks add
+      no undo steps), then drag fast in circles on each handle; the tool stays
+      responsive and `Ctrl+Z` steps back through only the real drags.
+- [ ] Fit axes automatically (default on): drag a group to the edge of the plot
+      or stretch it past the frame: on release the axes grow to hold every
+      group's 2-sigma box (rounded ends, never shrinking) and the sidebar
+      ranges follow. Turn it off: the axes stay and the ellipse is clipped.
+- [ ] Type an x range that hides a group (e.g. 50 to 60 with the groups near
+      5): the axes expand to keep every group in view and the message "Axes
+      expanded to keep every group in view" shows; one undo step. Reset axes
+      returns to the initial limits (expanding again if a mean is outside, with
+      the message), and does nothing when already there.
+- [ ] Groups: add `C` (appears at the view centre, small, rho 0, others
+      untouched); rename `B` to `Z` (ellipse kept); remove one: the message "A
+      removed - Ctrl+Z to undo" shows in the canvas. Invalid (`A, A`, empty, 11
+      names): notification, no change. Clear puts every group back on the
+      initial layout (undoable) and keeps names, n and the axes.
+- [ ] `dcr_bivariate(c("A", "B", "C"), n = 4e5)` errors before opening;
+      `n = 0` errors; in the sidebar a sample size that would exceed 1e6 rows
+      is ignored. Modes: "Gestures" is accepted and behaves like "Handles"
+      for now.
+- [ ] Edit then Done: drag something, then type in a field (e.g. sample size
+      `37`) and click Done directly, without Enter or a click elsewhere.
+      `nrow(df) == 37 * 2` and the new value is applied.
+- [ ] Done from the console returns `n` rows per group with the group factor
+      levels in order; the column names follow the Names fields.
+- [ ] Done via *Addins > DataCraftR > Bivariate normal* inserts three lines
+      (spec, seed, load code) and `dcr_load()` of the inserted id reproduces
+      the same data.
+- [ ] Cancel (button and `Esc` outside a field) returns `NULL`.
+
 ## Count
 
 - [ ] Open `dcr_count(c("A", "B"), c("x", "y", "z"), ymax = 20)`: categories on
