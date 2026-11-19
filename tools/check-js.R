@@ -1990,8 +1990,351 @@ run_check("Bivariate Done flush", engine(c("bivariate")), paste0(flush_script, "
   })()
 "))
 
-cat("JS OK (", length(files), " files checked, History, EchoGuard (+expiry), Tool queue, ",
+# ---- Mosaic ------------------------------------------------------------------
+# Pure table maths, drags from the stroke-start snapshot, strokes, categories.
+mo_script <- "
+  var M = DCR.tools.mosaic;
+  var seed = 12345;
+  function rnd() { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; }
+  function mk(opts) {
+    var t = new DCR.tools.mosaic({clientWidth: 0, clientHeight: 0,
+      getBoundingClientRect: function () { return {left: 0, top: 0}; }}, opts || {});
+    t._geo = {x0: 0, y0: 0, w: 200, h: 100};      // 1 px = 1 observation at N = 200
+    t._dom = {svg: {setPointerCapture: function () {}}};
+    t.render = function () {};
+    return t;
+  }
+  function setCounts(t, m) { var s = t.state; s.counts = m; t.commit(s); }
+  function stroke(t, pts) {
+    t._pointerDown({button: 0, pointerId: 1, clientX: pts[0][0], clientY: pts[0][1]});
+    pts.slice(1).forEach(function (p) {
+      t._pointerMove({pointerId: 1, clientX: p[0], clientY: p[1]});
+    });
+    t._pointerUp({pointerId: 1}); t.endStroke();
+  }
+  function sum(a) { return a.reduce(function (s, v) { return s + v; }, 0); }
+  function flat(m) { return [].concat.apply([], m); }
+  function cT(m, c) { return sum(m.map(function (r) { return r[c]; })); }
+  function rT(m, r) { return sum(m[r]); }
+  function eq(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+  function near(a, b, tol) { return Math.abs(a - b) < tol; }
+  function bxOf(t) { return t._borders(t.state.counts, t._geo)[1]; }
+"
+run_check("Mosaic maths", engine("mosaic"), paste0(mo_script, "
+  (function () {
+    var ok = [], i, j, k;
+    // allocate: exact sums for random weights and totals, ties to the earlier index
+    var allExact = true;
+    for (i = 0; i < 200; i++) {
+      var n = 1 + Math.floor(rnd() * 10), w = [], total = Math.floor(rnd() * 5000);
+      for (j = 0; j < n; j++) w.push(rnd() < 0.3 ? 0 : Math.floor(rnd() * 1000));
+      var a = M.allocate(total, w);
+      if (sum(a) !== total || a.some(function (v) { return v < 0 || v !== Math.round(v); }) ||
+          (sum(w) > 0 && a.some(function (v, q) { return w[q] === 0 && v !== 0; }))) allExact = false;
+    }
+    ok.push(allExact);
+    ok.push(eq(M.allocate(1, [1, 1, 1]), [1, 0, 0]) && eq(M.allocate(2, [3, 3, 3]), [1, 1, 0]));
+    ok.push(eq(M.allocate(7, [0, 0]), [4, 3]) && eq(M.allocate(2, [0, 0, 0]), [1, 1, 0]));
+    ok.push(eq(M.allocate(10, [1, 2, 3]), [2, 3, 5]) && eq(M.allocate(0, [4, 5]), [0, 0]));
+    // independent: both margins exactly (3 x 4, N = 997); known 2 x 2
+    var m = [[], [], []], left = 997;
+    for (i = 0; i < 3; i++) for (j = 0; j < 4; j++) {
+      var v = i === 2 && j === 3 ? left : Math.min(left, Math.floor(rnd() * 150));
+      m[i].push(v); left -= v;
+    }
+    var ind = M.independent(m), marg = true;
+    for (i = 0; i < 3; i++) if (rT(ind, i) !== rT(m, i)) marg = false;
+    for (j = 0; j < 4; j++) if (cT(ind, j) !== cT(m, j)) marg = false;
+    ok.push(marg && sum(flat(ind)) === 997 && flat(ind).every(function (v) { return v >= 0; }));
+    ok.push(eq(M.independent([[30, 20], [10, 40]]), [[20, 30], [20, 30]]));
+    // rescale: sums to N, keeps zeros; the zero table becomes uniform
+    var rs = M.rescale([[0, 5, 5], [10, 0, 3]], 41);
+    ok.push(sum(flat(rs)) === 41 && rs[0][0] === 0 && rs[1][1] === 0);
+    ok.push(eq(M.rescale([[0, 0], [0, 0]], 5), [[2, 1], [1, 1]]));
+    // Review focus 3: N below the number of cells; N = 1e6, fast
+    ok.push(eq(M.uniform(3, 4, 3), [[1, 1, 1, 0], [0, 0, 0, 0], [0, 0, 0, 0]]));
+    var t0 = Date.now(), big = M.rescale(M.uniform(10, 10, 997), 1e6), big2 = M.uniform(10, 10, 1e6);
+    var m3 = M.rescale([[1, 2, 3], [4, 5, 6], [7, 8, 9]], 3);
+    ok.push(sum(flat(big)) === 1e6 && sum(flat(big2)) === 1e6 && Date.now() - t0 < 1000 &&
+            sum(flat(m3)) === 3 && flat(m3).every(function (v) { return v >= 0; }));
+    // dragColumn: conserves N; the two totals change by exactly the delta
+    var st = [[10, 20, 5], [30, 10, 5]];
+    var d = M.dragColumn(st, 0, 15);
+    ok.push(cT(d, 0) === 55 && cT(d, 1) === 15 && cT(d, 2) === 10 && sum(flat(d)) === 80 &&
+            eq(d.map(function (r) { return r[2]; }), [5, 5]));
+    ok.push(cT(M.dragColumn(st, 1, 100), 1) === 40 && cT(M.dragColumn(st, 1, 100), 2) === 0);   // clamp
+    ok.push(cT(M.dragColumn(st, 0, -100), 0) === 0 && cT(M.dragColumn(st, 0, -100), 1) === 70);
+    ok.push(eq(M.dragColumn(st, 0, 0), st) && eq(M.dragColumn(st, 1, 0), st));
+    // each column keeps its row shares (start 10:30 -> 25%/75%)
+    ok.push(eq(M.dragColumn([[10, 0], [30, 0]], 0, -20).map(function (r) { return r[0]; }), [5, 15]));
+    // zero column revived with an even split (earlier rows first)
+    var z = M.dragColumn(st, 0, -100);
+    ok.push(eq(M.dragColumn(z, 0, 11).map(function (r) { return r[0]; }), [6, 5]));
+    // dragCut: only the column changes, its total is unchanged, clamped at 0
+    var c3 = [[10, 20], [30, 10], [10, 10]];
+    var dc = M.dragCut(c3, 0, 0, 15);
+    ok.push(dc[0][0] === 25 && dc[1][0] === 15 && dc[2][0] === 10 && eq(dc.map(function (r) { return r[1]; }), [20, 10, 10]));
+    ok.push(M.dragCut(c3, 0, 0, 100)[0][0] === 40 && M.dragCut(c3, 0, 0, 100)[1][0] === 0 &&
+            M.dragCut(c3, 0, 0, -100)[0][0] === 0 && M.dragCut(c3, 0, 0, -100)[1][0] === 40);
+    ok.push(eq(M.dragCut(c3, 0, 1, 0), c3));
+    // chisq against R chisq.test(correct = FALSE)
+    var q = M.chisq([[30, 20], [10, 40]]);
+    ok.push(near(q.stat, 16.6666666666667, 1e-6) && q.df === 1 && near(q.p, 4.45570906040561e-05, 1e-6) &&
+            near(q.v, 0.408248290463863, 1e-6) && near(q.or, 6, 1e-9) && near(q.rr, 8 / 3, 1e-9) &&
+            q.expectedLow === 0);
+    q = M.chisq([[12, 7, 4], [5, 15, 8], [9, 3, 20]]);
+    ok.push(near(q.stat, 22.7575848064978, 1e-6) && q.df === 4 && near(q.p, 0.000141557058070167, 1e-6) &&
+            near(q.v, 0.370261913213462, 1e-6) && q.or === null && q.rr === null);
+    q = M.chisq([[5, 5], [0, 5]]);
+    ok.push(q.or === null && q.rr === null && M.chisq([[1, 2], [3, 4]]).expectedLow === 4);
+    q = M.chisq([[0, 0], [5, 5]]);
+    ok.push(q.df === 0 && q.p === null && q.v === null && q.stat === 0);
+    q = M.chisq([[1, 3], [2, 4]]);
+    ok.push(near(q.stat, 0.0793650793650794, 1e-9));
+    return ok.join(',');
+  })()
+"))
+
+run_check("Mosaic strokes", engine("mosaic"), paste0(mo_script, "
+  (function () {
+    var ok = [], t, depth, i;
+    t = mk({n: 200});                       // 2 x 2 uniform: border at x = 100, cuts at y = 50
+    ok.push(eq(t.state.counts, [[50, 50], [50, 50]]) && eq(t.state.cols, ['No', 'Yes']));
+    // vertical border: drag right 40 px = 40 observations; one history entry
+    depth = t.history._index;
+    stroke(t, [[100, 20], [120, 20], [140, 20]]);
+    ok.push(eq(t.state.counts, [[70, 30], [70, 30]]) && t.history._index === depth + 1);
+    t.undo(); ok.push(eq(t.state.counts, [[50, 50], [50, 50]]));
+    // Review focus 1: back to the start inside one stroke = the start table (non-uniform start)
+    setCounts(t, [[60, 10], [30, 100]]);
+    var start = JSON.parse(JSON.stringify(t.state.counts)); depth = t.history._index;
+    var bxp = 90;                                            // border at 90 observations
+    stroke(t, [[bxp, 20], [bxp + 40, 20], [bxp + 90, 20], [bxp, 20]]);
+    ok.push(eq(t.state.counts, start) && t.history._index === depth);
+    stroke(t, [[bxp, 20], [bxp + 500, 20], [bxp - 500, 20], [bxp + 7, 20], [bxp, 20]]);   // clamped both ways
+    ok.push(eq(t.state.counts, start) && t.history._index === depth);
+    // mid-stroke the table follows the pointer relative to the press
+    t._pointerDown({button: 0, pointerId: 1, clientX: bxp, clientY: 20});
+    t._pointerMove({pointerId: 1, clientX: bxp + 20, clientY: 20});
+    ok.push(cT(t.state.counts, 0) === 110 && cT(t.state.counts, 1) === 90);
+    t._pointerMove({pointerId: 1, clientX: bxp - 10, clientY: 20});
+    ok.push(cT(t.state.counts, 0) === 80 && cT(t.state.counts, 1) === 120);
+    t._pointerUp({pointerId: 1}); t.endStroke();
+    ok.push(t.history._index === depth + 1 && sum(flat(t.state.counts)) === 200);
+    t.undo();
+    // horizontal cut: drag the column-0 cut (y = 60/90*100 ... uniform here)
+    t = mk({n: 200}); depth = t.history._index;
+    stroke(t, [[50, 50], [50, 60], [50, 70]]);                   // down 20 px of 100 -> +20
+    ok.push(eq(t.state.counts, [[70, 50], [30, 50]]) && t.history._index === depth + 1);
+    stroke(t, [[50, 70], [50, 20]]);                              // back up by 50 -> clamped
+    ok.push(eq(t.state.counts, [[20, 50], [80, 50]]));
+    stroke(t, [[50, 20], [50, 500]]);
+    ok.push(t.state.counts[1][0] === 0 && t.state.counts[0][0] === 100 && cT(t.state.counts, 1) === 100);
+    // Review focus 2: column dragged to 0 and back out; the zero column's border stays grabbable
+    t = mk({n: 200}); setCounts(t, [[50, 50], [30, 70]]);        // col totals 80, 120
+    stroke(t, [[80, 20], [0, 20]]);                              // drag border 0 to the left edge
+    ok.push(cT(t.state.counts, 0) === 0 && cT(t.state.counts, 1) === 200);
+    stroke(t, [[1, 20], [31, 20]]);                              // grab the zero-width border, pull out
+    ok.push(cT(t.state.counts, 0) === 30 && eq(t.state.counts.map(function (r) { return r[0]; }), [15, 15]));
+    // coincident borders (right edge): left picks the first, right the last
+    t = mk({cols: ['a', 'b', 'c'], n: 200}); setCounts(t, [[100, 0, 0], [100, 0, 0]]);
+    stroke(t, [[199, 20], [169, 20]]);
+    ok.push(eq(t.state.counts.map(function (r) { return r.join(); }), ['85,15,0', '85,15,0']));
+    setCounts(t, [[100, 0, 0], [100, 0, 0]]);
+    stroke(t, [[199, 20], [199 + 30, 20]]);
+    ok.push(eq(t.state.counts, [[100, 0, 0], [100, 0, 0]]));    // right: nothing to take from col c
+    // coincident cuts: up picks the first cut, down the last
+    t = mk({rows: ['a', 'b', 'c'], n: 150});
+    setCounts(t, [[50, 50], [0, 50], [0, 50]]);                 // col 0: two cuts at its bottom
+    depth = t.history._index;
+    stroke(t, [[30, 99], [30, 79]]);
+    ok.push(t.state.counts.map(function (r) { return r[0]; }).join() === '40,10,0' && t.history._index === depth + 1);
+    setCounts(t, [[50, 50], [0, 50], [0, 50]]); depth = t.history._index;
+    stroke(t, [[30, 99], [30, 150]]);
+    ok.push(t.history._index === depth && t.state.counts[2][0] === 0);
+    // a zero-width column has no cuts: only its border is hit
+    t = mk({n: 200}); setCounts(t, [[0, 100], [0, 100]]);
+    var hz = t._hitTest(0, 50), hc = t._hitTest(40, 50);
+    ok.push(hz.kind === 'v' && hc.kind === 'h' && hc.list[0].col === 1);
+    // Review focus 4: 200 presses without moving (and < 3 px) never add history
+    t = mk({n: 200}); depth = t.history._index;
+    for (i = 0; i < 200; i++) {
+      var pts = [[100, 20], [50, 50], [150, 50], [100, 100], [3, 50]][i % 5];
+      t._pointerDown({button: 0, pointerId: 1, clientX: pts[0], clientY: pts[1]});
+      if (i % 2) t._pointerMove({pointerId: 1, clientX: pts[0] + 1, clientY: pts[1] + 2});
+      t._pointerUp({pointerId: 1}); t.endStroke();
+    }
+    ok.push(t.history._index === depth && !t._busy && !t._stroke && eq(t.state.counts, [[50, 50], [50, 50]]));
+    // a press that wanders out past the dead zone and back is also no change
+    stroke(t, [[100, 20], [100, 40], [100, 20]]);
+    ok.push(t.history._index === depth);
+    // 3 px is a real drag (3 observations); undo restores
+    stroke(t, [[100, 20], [103, 20]]);
+    ok.push(t.history._index === depth + 1 && cT(t.state.counts, 0) === 103);
+    t.undo(); ok.push(eq(t.state.counts, [[50, 50], [50, 50]]));
+    // a press off any border does nothing and takes no stroke
+    t._pointerDown({button: 0, pointerId: 1, clientX: 20, clientY: 20});
+    ok.push(!t._stroke && !t._busy);
+    t._pointerDown({button: 2, pointerId: 1, clientX: 100, clientY: 20});
+    ok.push(!t._stroke);
+    // stale stroke (no end event): the next press finishes it first
+    t = mk({n: 200}); depth = t.history._index;
+    t._pointerDown({button: 0, pointerId: 1, clientX: 100, clientY: 20});
+    t._pointerMove({pointerId: 1, clientX: 130, clientY: 20});
+    ok.push(t._busy === true);
+    stroke(t, [[50, 50], [50, 80]]);
+    ok.push(!t._busy && !t._stroke && t.history._index === depth + 2 && sum(flat(t.state.counts)) === 200);
+    t._pointerDown({button: 0, pointerId: 7, clientX: bxOf(t), clientY: 20});
+    t._pointerDown({button: 0, pointerId: 8, clientX: bxOf(t), clientY: 20});
+    ok.push(t._stroke && t._stroke.id === 8);
+    t._pointerUp({pointerId: 8}); t.endStroke();
+    t._dom.svg.hasPointerCapture = function () { return true; };
+    t._pointerDown({button: 0, pointerId: 1, clientX: bxOf(t), clientY: 20});
+    t._pointerDown({button: 0, pointerId: 2, clientX: bxOf(t), clientY: 20});
+    ok.push(t._stroke.id === 1);
+    t._pointerUp({pointerId: 1}); t.endStroke();
+    t._dom.svg.hasPointerCapture = undefined;
+    // a throwing commit never leaves the engine busy
+    t = mk({n: 200}); t.setControl('n', 300);
+    var real = t.commit;
+    t.commit = function () { throw new Error('boom'); };
+    t._pointerDown({button: 0, pointerId: 1, clientX: 100, clientY: 20});
+    t._pointerMove({pointerId: 1, clientX: 130, clientY: 20});
+    var threw = false;
+    try { t._pointerUp({pointerId: 1}); } catch (e) { threw = true; }
+    t.commit = real;
+    ok.push(threw && !t._busy && !t._stroke);
+    // controls and undo during a stroke are queued
+    t = mk({n: 200}); depth = t.history._index;
+    t._pointerDown({button: 0, pointerId: 1, clientX: 100, clientY: 20});
+    t.receiveControl('n', 300);
+    ok.push(t.history._index === depth);
+    t._pointerMove({pointerId: 1, clientX: 130, clientY: 20});
+    t._pointerUp({pointerId: 1}); t.endStroke();
+    ok.push(t.history._index === depth + 2 && sum(flat(t.state.counts)) === 300);
+    return ok.join(',');
+  })()
+"))
+
+run_check("Mosaic controls", engine("mosaic"), paste0(mo_script, "
+  (function () {
+    var ok = [], t, depth, flashed;
+    function msgs(t) { flashed = []; t._flash = function (m) { flashed.push(m); }; }
+    // defaults and options
+    t = mk(); ok.push(eq(t.state.rows, ['Healthy', 'Sick']) && t.state.names.col === 'exposure' &&
+                      sum(flat(t.state.counts)) === 200);
+    t = mk({cols: 'a', rows: ['x'], n: 0}); ok.push(eq(t.state.cols, ['No', 'Yes']) && sum(flat(t.state.counts)) === 200);
+    t = mk({cols: ['a', 'b', 'c'], rows: ['x', 'y'], n: 7, names: {col: 'g', row: 'h'}});
+    ok.push(eq(t.toSpec(), {tool: 'mosaic', cols: ['a', 'b', 'c'], rows: ['x', 'y'],
+                            names: {col: 'g', row: 'h'}, counts: [[2, 1, 1], [1, 1, 1]]}));
+    // N: rescale in one entry; unchanged and invalid add nothing
+    t = mk({n: 200}); depth = t.history._index;
+    t.setControl('n', 200); t.setControl('n', 0); t.setControl('n', 2.5); t.setControl('n', 2e6);
+    t.setControl('n', ''); t.setControl('n', null);
+    ok.push(t.history._index === depth);
+    t.setControl('n', 3);
+    ok.push(sum(flat(t.state.counts)) === 3 && t.history._index === depth + 1);
+    t.setControl('n', 1e6);
+    ok.push(sum(flat(t.state.counts)) === 1e6 && t.controls().n.value === 1e6);
+    t.undo(); t.undo(); ok.push(sum(flat(t.state.counts)) === 200);
+    // names
+    t.setControl('names', {col: 'a', row: 'a'}); t.setControl('names', {col: 'a', row: ''});
+    ok.push(t.state.names.col === 'exposure');
+    t.setControl('names', {col: ' k ', row: 'm'});
+    ok.push(t.state.names.col === 'k' && t.state.names.row === 'm' && t.history._index === depth + 1);
+    // Independent / Uniform / Clear
+    t = mk({n: 200}); setCounts(t, [[60, 10], [30, 100]]); depth = t.history._index;
+    t.action('independent');
+    var ind = t.state.counts;
+    ok.push(eq(ind, DCR.tools.mosaic.independent([[60, 10], [30, 100]])) && t.history._index === depth + 1);
+    t.action('independent'); ok.push(t.history._index === depth + 1);       // already independent
+    t.action('uniform'); ok.push(eq(t.state.counts, [[50, 50], [50, 50]]) && t.history._index === depth + 2);
+    t.action('uniform'); ok.push(t.history._index === depth + 2);
+    setCounts(t, [[60, 10], [30, 100]]); t.setControl('cols', 'p, q, r');
+    t.run('clear');
+    ok.push(sum(flat(t.state.counts)) === 200 && t.state.cols.length === 3 && t.state.counts[0].length === 3);
+    // Review focus 5: rename keeps counts; add starts at 0; remove deletes, N shrinks, notice, undo
+    t = mk({cols: ['a', 'b', 'c'], rows: ['x', 'y', 'z'], n: 90}); msgs(t);
+    setCounts(t, [[1, 2, 3], [4, 5, 6], [7, 8, 9]]); depth = t.history._index;
+    t.setControl('cols', 'a, B, c');
+    ok.push(eq(t.state.counts, [[1, 2, 3], [4, 5, 6], [7, 8, 9]]) && flashed.length === 0);
+    t.setControl('rows', 'z, x, y');                                    // reordered: counts follow names
+    ok.push(eq(t.state.counts, [[7, 8, 9], [1, 2, 3], [4, 5, 6]]));
+    t.setControl('rows', 'z, x, y, w');
+    ok.push(eq(t.state.counts[3], [0, 0, 0]) && flashed.length === 0);
+    t.setControl('rows', 'z, y, w');                                    // x removed (6 observations)
+    ok.push(eq(t.state.counts, [[7, 8, 9], [4, 5, 6], [0, 0, 0]]) && sum(flat(t.state.counts)) === 39 &&
+            flashed.length === 1 && flashed[0] === '6 observations of x removed ' + String.fromCharCode(8212) + ' Ctrl+Z to undo');
+    t.undo(); ok.push(eq(t.state.counts, [[7, 8, 9], [1, 2, 3], [4, 5, 6], [0, 0, 0]]) && t.state.rows.join() === 'z,x,y,w');
+    t.setControl('cols', 'a, c');                                       // B removed (2+5+8 = 15)
+    ok.push(t.state.cols.join() === 'a,c' && flashed.length === 2 && /^15 observations of B removed/.test(flashed[1]) &&
+            sum(flat(t.state.counts)) === 45 - 15);
+    t.undo(); ok.push(sum(flat(t.state.counts)) === 45 && t.state.cols.join() === 'a,B,c');
+    t.setControl('cols', 'a'); t.setControl('rows', 'x, x'); t.setControl('rows', 'x');   // invalid: ignored
+    ok.push(t.state.cols.length === 3 && t.state.rows.length === 4);
+    // removing every populated category leaves a uniform table of the old N
+    t = mk({cols: ['a', 'b'], rows: ['x', 'y'], n: 10}); msgs(t);
+    setCounts(t, [[4, 0], [6, 0]]);
+    t.setControl('cols', 'p, q, r');                                    // a, b -> not a rename
+    ok.push(sum(flat(t.state.counts)) === 10 && t.state.counts[0].length === 3);
+    return ok.join(',');
+  })()
+"))
+
+# Mosaic: toSpec() JSON from V8 is accepted by R; sampling gives back the table.
+mo_json <- function(setup) {
+  cx <- engine("mosaic")
+  cx$eval(paste0(mo_script, "var T = (function () {", setup, "})();"))
+  cx$eval("JSON.stringify(T.toSpec())")
+}
+mo_cases <- list(
+  two_by_two = "return mk();",
+  drag = "var t = mk(); stroke(t, [[100, 20], [160, 20]]); return t;",
+  three_by_four_zeros = "var t = mk({cols: ['a', 'b', 'c', 'd'], rows: ['x', 'y', 'z'], n: 120});
+    stroke(t, [[50, 20], [0, 20]]); return t;",
+  custom_names = "return mk({names: {col: 'group', row: 'status'}, n: 37, rows: ['u', 'v', 'w']});",
+  small_n = "return mk({cols: ['a', 'b', 'c'], rows: ['x', 'y', 'z'], n: 4});",
+  big_n = "return mk({cols: ['a', 'b', 'c'], rows: ['x', 'y'], n: 1e6});",
+  after_categories = "var t = mk({cols: ['a', 'b', 'c'], n: 60}); t._flash = function () {};
+    t.setControl('cols', 'a, z, c'); t.setControl('rows', 'Sick, Healthy, Other'); return t;"
+)
+for (nm in names(mo_cases)) {
+  spec <- tryCatch(as_dcr_spec(jsonlite::fromJSON(mo_json(mo_cases[[nm]]))),
+                   error = function(e) {
+                     message("Mosaic round trip failed (", nm, "): ", conditionMessage(e))
+                     quit(status = 1)
+                   })
+  df <- sample_spec(spec, NULL)
+  tab <- table(df[[1]], df[[2]])
+  stopifnot(inherits(spec, "dcr_spec"), is.matrix(spec$counts),
+            nrow(df) == sum(spec$counts), sum(spec$counts) >= 1,
+            identical(names(df), c(spec$names$col, spec$names$row)),
+            identical(unname(unclass(tab)), unname(t(spec$counts))),
+            identical(levels(df[[1]]), spec$cols), identical(levels(df[[2]]), spec$rows))
+  if (nm == "custom_names") stopifnot(identical(names(df), c("group", "status")))
+  if (nm == "three_by_four_zeros") stopifnot(any(spec$counts == 0))
+}
+
+# Mosaic: Done flushes the sidebar (cols / rows / n / names).
+run_check("Mosaic Done flush", engine("mosaic"), paste0(flush_script, "
+  (function () {
+    var d = new DCR.tools.mosaic(el(), {});
+    d._flash = function () {};
+    sidebar = {cols: 'a, b, c', rows: 'x, y', n: 300, names: {col: 'g', row: 'h'}};
+    var s = doneSpec(d);
+    var tot = s.counts.reduce(function (a, r) { return a + r.reduce(function (b, v) { return b + v; }, 0); }, 0);
+    return [s !== null && s.cols.join() === 'a,b,c' && s.rows.join() === 'x,y' && tot === 300 &&
+            s.names.col === 'g' && s.counts[0].length === 3,
+            (function () {
+              sidebar = {cols: 'A, A', rows: 'x', n: 0, names: {col: 'a', row: 'a'}};
+              var s2 = doneSpec(d);
+              return s2 !== null && s2.cols.join() === 'a,b,c' && s2.counts.length === 2;
+            })()].join(',');
+  })()
+"))
+
+cat("JS OK (", length(files), " files checked,History, EchoGuard (+expiry), Tool queue, ",
     "Scatter (+offset range, R round trip), Boxplot (+ordering, R round trip), ",
-    "Histogram (+R round trip), Count (+R round trip), Density (+R round trip, Done flush), Bivariate (+R round trip, Done flush), ",
+    "Histogram (+R round trip), Count (+R round trip), Density (+R round trip, Done flush), Bivariate (+R round trip, Done flush), Mosaic (+R round trip, Done flush), ",
     "Done flush, Removal notices OK)\n",
     sep = "")

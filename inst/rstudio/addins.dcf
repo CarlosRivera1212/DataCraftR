@@ -27,3 +27,8 @@ Name: Bivariate normal
 Description: Draw bivariate normal populations and insert code to sample them
 Binding: dcr_bivariate_addin
 Interactive: true
+
+Name: Mosaic (contingency table)
+Description: Draw an exact two-way contingency table and insert code to load it
+Binding: dcr_mosaic_addin
+Interactive: true

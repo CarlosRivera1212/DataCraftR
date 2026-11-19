@@ -342,6 +342,50 @@ Start: `df <- dcr_scatter()` (groups A, B, C; x and y ranges 0 to 10).
       capped at 1e6 observations"; painting stops growing once the total hits
       1e6. Done returns without hanging.
 
+## Mosaic
+
+- [ ] Open `dcr_mosaic()`: a 2 x 2 table of 50 each (N = 200), blocks coloured
+      by row category with their counts (and % of N when big enough), column
+      names and `n=` totals under the columns, the row legend with row totals
+      on the right, and the stats panel at the bottom (chi-square 0, df 1,
+      p 1, Cramer's V 0; odds ratio and relative risk labelled
+      "(Sick: Yes vs No)").
+- [ ] Hover a vertical border: it thickens and the cursor becomes a
+      horizontal resize arrow; hover a cut inside a column: vertical resize
+      arrow. Drag a border: observations move between the two neighbouring
+      columns (each keeps its row proportions); the totals under the columns
+      and the stats follow. Drag a cut: only that column's two blocks change.
+- [ ] Drag a border away and back to where you pressed (in one drag): the
+      table is exactly the one you started with, and `Ctrl+Z` does not have an
+      extra step. Drag well past the edge and back: same.
+- [ ] Drag a column to zero width, release, then grab its (now coincident)
+      border and pull it out: the column returns with its rows split evenly.
+      With two or more empty columns side by side, the border that follows the
+      pointer is the one on the side you drag toward.
+- [ ] One drag = one undo step. A click without moving (or a wiggle under
+      3 px) adds no undo step. Click and drag rapidly and repeatedly on
+      borders and cuts, also letting go outside the plot: it never freezes
+      and the table always sums to N.
+- [ ] Independent makes every cell row total x column total / N (both
+      margins unchanged, chi-square about 0); Uniform spreads N evenly. Each
+      is one undo step and repeating one adds nothing. Toolbar Clear = Uniform
+      with the current categories and N.
+- [ ] Change N (e.g. 997, 3, 1000000): every cell is rescaled, the total is
+      exactly N and no cell goes negative; with N smaller than the number of
+      cells the first cells get 1. 0 and 2.5 give a notification and no change.
+- [ ] Rename a column or row category: counts kept. Add one: it starts at 0.
+      Remove a non-empty one: the message "N observations of X removed - Ctrl+Z
+      to undo" appears in the canvas, N shrinks and `Ctrl+Z` restores it.
+      Invalid (one category, duplicates, empty, 11 names): notification, no
+      change.
+- [ ] Edit then Done: type a new N or category list and click Done without
+      leaving the field; the returned data has the new N / categories.
+- [ ] `dcr_mosaic()` then Done returns a data frame with N rows and factor
+      columns `exposure` and `outcome` (levels in the drawn order);
+      `table(df)` equals the drawn counts. Custom `names` are respected.
+- [ ] Done via *Addins > DataCraftR > Mosaic (contingency table)* inserts 3
+      lines; running them (`dcr_load()`) reproduces the same data.
+
 ## RStudio integration
 
 Run these in RStudio itself (they cannot be checked from the console tests).
