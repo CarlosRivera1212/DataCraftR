@@ -179,6 +179,30 @@
     return { xlim: fitLimits(xlim, b.xlo, b.xhi), ylim: fitLimits(ylim, b.ylo, b.yhi) };
   }
 
+  // Keep |rho| <= 0.999 for any angle: s_other * RATIO <= s <= s_other / RATIO
+  // (so what is drawn is what is sampled), within [smin, smax].
+  var RATIO = 0.02237;
+  function clampSd(v, other, smin, smax) {
+    return clamp(v, Math.max(smin, RATIO * other), Math.min(smax, other / RATIO));
+  }
+
+  // Distance from (x, y) along (dx, dy) to the edge of the view.
+  function reach(x, y, dx, dy, xlim, ylim) {
+    var t = Infinity;
+    if (dx > 1e-12) t = Math.min(t, (xlim[1] - x) / dx);
+    else if (dx < -1e-12) t = Math.min(t, (xlim[0] - x) / dx);
+    if (dy > 1e-12) t = Math.min(t, (ylim[1] - y) / dy);
+    else if (dy < -1e-12) t = Math.min(t, (ylim[0] - y) / dy);
+    return t;
+  }
+
+  // Autofit off: both handles stay inside the view (never unreachable).
+  function capToView(e, xlim, ylim, smin) {
+    var c = Math.cos(e.th), s = Math.sin(e.th);
+    e.s1 = Math.max(smin, Math.min(e.s1, reach(e.mx, e.my, c, s, xlim, ylim)));
+    e.s2 = Math.max(smin, Math.min(e.s2, reach(e.mx, e.my, -s, c, xlim, ylim)));
+  }
+
   var Bivariate = DCR.extend(DCR.Tool, {
     init: function (o) {
       this.ui = {
@@ -249,7 +273,7 @@
       switch (key) {
         case "groups":
           v = cleanNames(typeof value === "string" ? value.split(",") : value);
-          return v && s.n * v.length <= 1e6 ? v : null;
+          return v;
         case "active":
           v = parseInt(value, 10) - 1;
           return v >= 0 && v < s.groups.length ? v : null;
@@ -258,8 +282,7 @@
         case "autofit":
           return typeof value === "boolean" ? value : null;
         case "n":
-          v = cleanWhole(value, 1, 1e6);
-          return v !== null && v * s.groups.length <= 1e6 ? v : null;
+          return cleanWhole(value, 1, 1e6);
         case "xlim":
         case "ylim":
           return cleanRange(value);
@@ -274,7 +297,9 @@
       if (v === null) return;
       switch (key) {
         case "groups":
-          if (!same(v, s.groups)) this._setGroups(v);
+          if (same(v, s.groups)) break;
+          if (this._tooMany(s.n, v.length)) return;
+          this._setGroups(v);
           break;
         case "active":
           if (v !== ui.active) {
@@ -290,6 +315,10 @@
           }
           break;
         case "n":
+          if (v === s.n) break;
+          if (this._tooMany(v, s.groups.length)) return;
+          this._commitWith(key, v);
+          break;
         case "names":
           if (!same(v, s[key])) this._commitWith(key, v);
           break;
@@ -300,6 +329,14 @@
           this._applyLimits(s.xlim, v);
           break;
       }
+    },
+
+    // n x groups over 1e6 rows: refuse, say so and put the sidebar back.
+    _tooMany: function (n, k) {
+      if (n * k <= 1e6) return false;
+      this._flash("n x groups must be at most 1e6 (" + n + " x " + k + ")");
+      this.syncControls();
+      return true;
     },
 
     _commitWith: function (key, value) {
@@ -392,9 +429,14 @@
       var s = this.state, i = this.activeIndex(), e = s.ell[i], HIT = 0.28 * this._unit();
       var h = this._handles(e);
       function d(q) { return Math.hypot(p.x - q.x, p.y - q.y); }
-      if (d(h.major) < HIT) return { kind: "major", i: i };
-      if (d(h.minor) < HIT) return { kind: "minor", i: i };
-      if (d({ x: e.mx, y: e.my }) < HIT) return { kind: "move", i: i };
+      // the nearest of major, minor and centre within HIT wins, so a thin
+      // ellipse's centre stays grabbable
+      var best = null, bd = HIT;
+      [["major", h.major], ["minor", h.minor], ["move", { x: e.mx, y: e.my }]].forEach(function (c) {
+        var dist = d(c[1]);
+        if (dist < bd) { bd = dist; best = { kind: c[0], i: i }; }
+      });
+      if (best) return best;
       for (var j = 0; j < s.ell.length; j++) {
         if (j !== i && this._inside2(s.ell[j], p)) return { kind: "select", i: j };
       }
@@ -425,8 +467,13 @@
         id: ev.pointerId, kind: hit.kind, i: hit.i, moved: false,
         cx: ev.clientX, cy: ev.clientY,
         start: copy(e), off: { x: e.mx - p.x, y: e.my - p.y },
-        ang: Math.atan2(p.y - e.my, p.x - e.mx), acc: 0
+        ang: Math.atan2(p.y - e.my, p.x - e.mx), acc: 0,
+        r0: Math.hypot(p.x - e.mx, p.y - e.my)
       };
+      // minor handle: signed projection of the grab on the minor axis
+      var qn = { x: -Math.sin(e.th), y: Math.cos(e.th) };
+      this._stroke.q0 = (p.x - e.mx) * qn.x + (p.y - e.my) * qn.y;
+      this._stroke.sgn = this._stroke.q0 >= 0 ? 1 : -1;
       this.beginStroke();
       this._requestDraw();
     },
@@ -450,18 +497,24 @@
         e.mx = clamp(p.x + st.off.x, s.xlim[0], s.xlim[1]);
         e.my = clamp(p.y + st.off.y, s.ylim[0], s.ylim[1]);
       } else if (st.kind === "major") {
+        // additive: s1 follows the pointer's radial change since the grab, so
+        // grabbing off the handle centre never jumps; the angle is frozen
+        // while the pointer is too close to the centre to define one
         var r = Math.hypot(p.x - e.mx, p.y - e.my);
-        if (r > 1e-12) {
+        if (r >= 0.14 * this._unit()) {
           var a = Math.atan2(p.y - e.my, p.x - e.mx), da = a - st.ang;
           st.acc += Math.atan2(Math.sin(da), Math.cos(da));
           st.ang = a;
           e.th = st.start.th + st.acc;
         }
-        e.s1 = clamp(r, smin, smax);
+        e.s1 = clampSd(st.start.s1 + (r - st.r0), e.s2, smin, smax);
       } else {
-        var proj = (p.x - e.mx) * -Math.sin(e.th) + (p.y - e.my) * Math.cos(e.th);
-        e.s2 = clamp(Math.abs(proj), smin, smax);
+        // signed projection on the (fixed) minor axis, relative to the grab:
+        // pulling through the centre stops at the minimum, never mirrors
+        var q = (p.x - e.mx) * -Math.sin(e.th) + (p.y - e.my) * Math.cos(e.th);
+        e.s2 = clampSd(st.start.s2 + st.sgn * (q - st.q0), e.s1, smin, smax);
       }
+      if (!this.ui.autofit) capToView(e, s.xlim, s.ylim, smin);
       this._requestDraw();
     },
 
@@ -668,5 +721,6 @@
   Bivariate.initial = initial;
   Bivariate.fitLimits = fitLimits;
   Bivariate.contains = contains;
+  Bivariate.clampSd = clampSd;
   DCR.register("bivariate", Bivariate);
 })(typeof window !== "undefined" ? window : this);

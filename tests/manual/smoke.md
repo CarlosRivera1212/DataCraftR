@@ -238,8 +238,11 @@ Start: `df <- dcr_scatter()` (groups A, B, C; x and y ranges 0 to 10).
       changes, the other does not); drag the minor handle both ways; rotate by
       dragging the major handle round the centre, past 180 degrees and several
       turns, with no jump at the grab and no flip of the axes. Pulling a handle
-      through the centre never gives a zero or negative sd (it stops at a tiny
-      minimum and mirrors past it).
+      through the centre never gives a zero or negative sd: it stops at a tiny
+      minimum and stays there, however far you go (no mirroring). Grabbing a
+      handle slightly off its centre does not make it jump. With "Fit axes
+      automatically" off a handle cannot be pulled out of the plot, and a
+      very thin ellipse's centre can still be grabbed.
 - [ ] Click inside another group's 2-sigma ellipse: it becomes the active group
       (sidebar buttons follow) and nothing is added to the undo history.
       Keys `1`-`2` do the same.
@@ -264,8 +267,9 @@ Start: `df <- dcr_scatter()` (groups A, B, C; x and y ranges 0 to 10).
       names): notification, no change. Clear puts every group back on the
       initial layout (undoable) and keeps names, n and the axes.
 - [ ] `dcr_bivariate(c("A", "B", "C"), n = 4e5)` errors before opening;
-      `n = 0` errors; in the sidebar a sample size that would exceed 1e6 rows
-      is ignored. Modes: "Gestures" is accepted and behaves like "Handles"
+      `n = 0` errors; in the sidebar a sample size (or group list) that would
+      exceed 1e6 rows is refused: the message "n x groups must be at most 1e6"
+      shows and the sidebar goes back to the previous value. Modes: "Gestures" is accepted and behaves like "Handles"
       for now.
 - [ ] Edit then Done: drag something, then type in a field (e.g. sample size
       `37`) and click Done directly, without Enter or a click elsewhere.

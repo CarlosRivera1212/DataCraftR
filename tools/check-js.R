@@ -1374,7 +1374,7 @@ run_check("Bivariate handles", engine("bivariate"), paste0(bv_script, "
     var gx = h[0] + 1.5, gy = h[1] + 1.5;
     var ga = Math.atan2(-(gy - c[1]), gx - c[0]);
     stroke(t, [[gx, gy], [gx + 4 * Math.cos(ga), gy - 4 * Math.sin(ga)]]);
-    ok.push(near(t.state.ell[0].th, th0, 1e-9) && t.state.ell[0].s1 > s10);
+    ok.push(near(t.state.ell[0].th, th0, 1e-9) && near(t.state.ell[0].s1, s10 + 0.4, 1e-9));
     // rotation through +-180 never flips an axis: s1 stays, th accumulates 450 degrees
     t = mk(['A']); e = t.state.ell[0]; h = handle(t, 'major'); c = centre(t);
     r = Math.hypot(h[0] - c[0], h[1] - c[1]); a0 = Math.atan2(-(h[1] - c[1]), h[0] - c[0]);
@@ -1399,14 +1399,52 @@ run_check("Bivariate handles", engine("bivariate"), paste0(bv_script, "
     stroke(t, [[h[0], h[1]], [c[0], c[1]]]);
     e = t.state.ell[0];
     ok.push(e.s2 === 0.05 && near(e.s1, s10) && near(e.th, th1));
-    // and past it: mirrored (|projection|), still not swapped
+    // and past it: stays at the minimum (no mirroring), further out too; no swap
     t = mk(['A']); h = handle(t, 'minor'); c = centre(t);
     stroke(t, [[h[0], h[1]], [c[0], c[1]], [2 * c[0] - h[0], 2 * c[1] - h[1]]]);
     e = t.state.ell[0];
-    ok.push(near(e.s2, s20, 1e-6) && near(e.s1, s10) && near(e.th, th1) && e.s2 > 0);
-    // huge pull: clamped to SMAX (10 x the larger range)
+    ok.push(e.s2 === 0.05 && near(e.s1, s10) && near(e.th, th1));
+    t = mk(['A']); h = handle(t, 'minor'); c = centre(t);
+    stroke(t, [[h[0], h[1]], [c[0], c[1]], [3 * c[0] - 2 * h[0], 3 * c[1] - 2 * h[1]]]);
+    e = t.state.ell[0];
+    ok.push(e.s2 === 0.05 && near(e.s1, s10) && near(e.th, th1));
+    // huge pull: capped by SMAX and by the rho bound s1 <= s2 / 0.02237
     t = mk(['A']); h = handle(t, 'major'); stroke(t, [[h[0], h[1]], [h[0] + 1e7, h[1]]]);
-    ok.push(near(t.state.ell[0].s1, 100) && finite(t));
+    e = t.state.ell[0];
+    ok.push(e.s1 <= 100 && e.s1 <= e.s2 / 0.02237 + 1e-9 && e.s1 > 10 && finite(t));
+    // M-1: extreme stretches at th = pi/4 never need toMarginal's rho clamp
+    function rawRho(e) {
+      var c = Math.cos(e.th), s = Math.sin(e.th), a = e.s1 * e.s1, b = e.s2 * e.s2;
+      return (a - b) * s * c / Math.sqrt((a * c * c + b * s * s) * (a * s * s + b * c * c));
+    }
+    t = mk(['A']); t.state.ell[0] = {mx: 5, my: 5, s1: 100, s2: 100, th: Math.PI / 4}; t.commit(t.state);
+    t.state.xlim = [-100, 100]; t.state.ylim = [-100, 100]; t.commit(t.state);
+    t._geo = {left: 0, top: 0, width: 100, height: 100, k: 0.5};
+    h = handle(t, 'minor'); c = centre(t);
+    stroke(t, [[h[0], h[1]], [c[0], c[1]]]);                         // minor to the minimum
+    ok.push(Math.abs(rawRho(t.state.ell[0])) <= 0.999 && t.state.ell[0].s2 >= 0.02237 * 100 - 1e-9);
+    h = handle(t, 'major'); c = centre(t);
+    stroke(t, [[h[0], h[1]], [c[0], c[1]]]);                         // major to the minimum
+    ok.push(Math.abs(rawRho(t.state.ell[0])) <= 0.999 && finite(t) &&
+            t.state.ell[0].s1 >= 0.02237 * t.state.ell[0].s2 - 1e-9);
+    // I-4: a thin ellipse's centre is still grabbable (nearest of the three wins)
+    t = mk(['A']); t.state.ell[0] = {mx: 5, my: 5, s1: 2, s2: 0.02, th: 0.3}; t.commit(t.state);
+    c = centre(t);
+    stroke(t, [[c[0], c[1]], [c[0] + 10, c[1]]]);
+    ok.push(near(t.state.ell[0].mx, 6) && t.state.ell[0].s2 === 0.02 && near(t.state.ell[0].s1, 2));
+    // I-5: autofit off: a handle can never be stretched out of the view
+    t = mk(['A']); t.setControl('autofit', false);
+    h = handle(t, 'major'); stroke(t, [[h[0], h[1]], [h[0] + 1e4, h[1]]]);
+    var hm = t._handles(t.state.ell[0]);
+    ok.push(hm.major.x <= 10 + 1e-9 && hm.major.y <= 10 + 1e-9 && hm.major.x >= -1e-9 && finite(t));
+    h = handle(t, 'minor'); stroke(t, [[h[0], h[1]], [h[0] - 1e4, h[1] - 1e4]]);
+    hm = t._handles(t.state.ell[0]);
+    ok.push(hm.minor.x >= -1e-9 && hm.minor.y >= -1e-9 && hm.minor.x <= 10 + 1e-9 &&
+            hm.minor.y <= 10 + 1e-9 && finite(t));
+    // M-2: a major drag through the centre does not spin th with tiny vectors
+    t = mk(['A']); th0 = t.state.ell[0].th; c = centre(t); h = handle(t, 'major');
+    stroke(t, [[h[0], h[1]], [c[0] + 0.01, c[1] + 0.01], [c[0] + 0.02, c[1] - 0.01], [c[0] - 0.01, c[1] + 0.02], [h[0], h[1]]]);
+    ok.push(near(t.state.ell[0].th, th0, 1e-9) && finite(t));
     // near-circular ellipse: many rotations through the centre stay finite
     t = mk(['A']); t.state.ell[0] = {mx: 5, my: 5, s1: 1, s2: 1, th: 0}; t.commit(t.state);
     for (i = 0; i < 30; i++) {
@@ -1579,7 +1617,7 @@ run_check("Bivariate groups and controls", engine("bivariate"), paste0(bv_script
     t = mk(['A', 'B']); d0 = t.history._index;
     t.receiveControl('n', 500); t.receiveControl('n', 500);
     t.receiveControl('names', {x: ' h ', y: 'w', group: 'g'});
-    t.receiveControl('n', 0); t.receiveControl('n', 600000); t.receiveControl('n', 2.5);
+    t.receiveControl('n', 0); t.receiveControl('n', 2.5);
     t.receiveControl('names', {x: 'a', y: 'a', group: 'g'});
     t.receiveControl('xlim', [5, 5]); t.receiveControl('ylim', ['', 3]); t.receiveControl('groups', 'A, A');
     ok.push(t.state.n === 500 && t.state.names.x === 'h' && t.history._index === d0 + 2 &&
@@ -1592,6 +1630,18 @@ run_check("Bivariate groups and controls", engine("bivariate"), paste0(bv_script
             t.history._index === d0 + 2);
     ok.push(mk(['A'], {mode: 'zzz'}).ui.mode === 'handles' && mk(['A']).ui.autofit === true &&
             mk(['A'], {autofit: false}).ui.autofit === false);
+    // I-3: n x groups > 1e6 is refused loudly: no change, one notice, sidebar re-synced
+    t = mk(['A', 'B']); d0 = t.history._index;
+    var pushed = [];
+    t.onControls(function (msgs) { pushed.push(msgs); });
+    t.receiveControl('n', 600000);
+    ok.push(t.state.n === 200 && t.history._index === d0 && t._flashed && t._flashed.length === 1 &&
+            /1e6/.test(t._flashed[0]) && pushed.length === 1 && pushed[0].n.value === 200);
+    t.setControl('n', 500000); ok.push(t.state.n === 500000);
+    t._flashed = null; pushed = [];
+    t.receiveControl('groups', 'A, B, C');
+    ok.push(t.state.groups.length === 2 && t._flashed && t._flashed.length === 1 &&
+            pushed.length === 1 && pushed[0].groups.value === 'A, B');
     // one group arrives from R as a scalar; names are trimmed
     t = mk(' solo ');
     ok.push(t.state.groups.join() === 'solo' && t.state.ell.length === 1);
@@ -1606,7 +1656,7 @@ run_check("Bivariate groups and controls", engine("bivariate"), paste0(bv_script
 bv_json <- function(setup) {
   cx <- engine("bivariate")
   cx$eval(paste0(bv_script, "var T = (function () {", setup, "})();"))
-  cx$eval("JSON.stringify(T.toSpec())")
+  cx$eval("JSON.stringify({spec: T.toSpec(), marg: T.state.ell.map(DCR.tools.bivariate.toMarginal)})")
 }
 bv_cases <- list(
   one_group = "var t = mk(['A']); stroke(t, [[50, 50], [60, 40]]); return t;",
@@ -1622,7 +1672,9 @@ bv_cases <- list(
 )
 for (nm in names(bv_cases)) {
   js <- bv_json(bv_cases[[nm]])
-  raw <- jsonlite::fromJSON(js)
+  both <- jsonlite::fromJSON(js, simplifyVector = FALSE)
+  raw <- jsonlite::fromJSON(jsonlite::toJSON(both$spec, auto_unbox = TRUE, digits = NA))
+  marg <- both$marg
   spec <- tryCatch(as_dcr_spec(raw), error = function(e) {
     message("Bivariate round trip failed (", nm, "): ", conditionMessage(e))
     quit(status = 1)
@@ -1634,7 +1686,12 @@ for (nm in names(bv_cases)) {
             isTRUE(all.equal(spec$sd_x, raw$sd_x, tolerance = 1e-9)),
             isTRUE(all.equal(spec$sd_y, raw$sd_y, tolerance = 1e-9)),
             isTRUE(all.equal(spec$rho, raw$rho, tolerance = 1e-9)),
-            all(spec$sd_x > 0), all(spec$sd_y > 0), all(abs(spec$rho) <= 0.999))
+            all(spec$sd_x > 0), all(spec$sd_y > 0), all(abs(spec$rho) <= 0.999),
+            isTRUE(all.equal(spec$mean_x, vapply(marg, function(m) m$mean_x, 0), tolerance = 1e-9)),
+            isTRUE(all.equal(spec$mean_y, vapply(marg, function(m) m$mean_y, 0), tolerance = 1e-9)),
+            isTRUE(all.equal(spec$sd_x, vapply(marg, function(m) m$sd_x, 0), tolerance = 1e-9)),
+            isTRUE(all.equal(spec$sd_y, vapply(marg, function(m) m$sd_y, 0), tolerance = 1e-9)),
+            isTRUE(all.equal(spec$rho, vapply(marg, function(m) m$rho, 0), tolerance = 1e-9)))
   if (nm == "rho_max") stopifnot(abs(spec$rho) == 0.999)
   if (nm == "offset_axes") stopifnot(spec$xlim[1] <= 1000, spec$ylim[2] >= 5)
   if (nm == "custom_names") {
