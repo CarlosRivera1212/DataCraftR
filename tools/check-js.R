@@ -1443,8 +1443,23 @@ run_check("Bivariate handles", engine("bivariate"), paste0(bv_script, "
             hm.minor.y <= 10 + 1e-9 && finite(t));
     // M-2: a major drag through the centre does not spin th with tiny vectors
     t = mk(['A']); th0 = t.state.ell[0].th; c = centre(t); h = handle(t, 'major');
-    stroke(t, [[h[0], h[1]], [c[0] + 0.01, c[1] + 0.01], [c[0] + 0.02, c[1] - 0.01], [c[0] - 0.01, c[1] + 0.02], [h[0], h[1]]]);
+    var loop = [[h[0], h[1]]];
+    for (k = 0; k <= 8; k++) {
+      a = k * Math.PI / 4;
+      loop.push([c[0] + 0.05 * Math.cos(a), c[1] + 0.05 * Math.sin(a)]);   // ~0.005 data units
+    }
+    loop.push([h[0], h[1]]);
+    stroke(t, loop);
     ok.push(near(t.state.ell[0].th, th0, 1e-9) && finite(t));
+    // I-A: with autofit off, moving the centre never changes s1 / s2 (one stroke, two strokes)
+    t = mk(['A']); t.setControl('autofit', false); e = copyOf(t.state.ell[0]); c = centre(t);
+    stroke(t, [[c[0], c[1]], [100, c[1]], [c[0], c[1]]]);
+    ok.push(t.state.ell[0].s1 === e.s1 && t.state.ell[0].s2 === e.s2 && t.state.ell[0].th === e.th);
+    t = mk(['A']); t.setControl('autofit', false); c = centre(t);
+    stroke(t, [[c[0], c[1]], [100, 100]]);
+    ok.push(near(t.state.ell[0].mx, 10) && t.state.ell[0].s1 === e.s1 && t.state.ell[0].s2 === e.s2);
+    c = centre(t); stroke(t, [[c[0], c[1]], [50, 50]]);
+    ok.push(t.state.ell[0].s1 === e.s1 && t.state.ell[0].s2 === e.s2 && t.state.ell[0].th === e.th);
     // near-circular ellipse: many rotations through the centre stay finite
     t = mk(['A']); t.state.ell[0] = {mx: 5, my: 5, s1: 1, s2: 1, th: 0}; t.commit(t.state);
     for (i = 0; i < 30; i++) {

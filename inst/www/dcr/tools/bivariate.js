@@ -196,11 +196,9 @@
     return t;
   }
 
-  // Autofit off: both handles stay inside the view (never unreachable).
-  function capToView(e, xlim, ylim, smin) {
-    var c = Math.cos(e.th), s = Math.sin(e.th);
-    e.s1 = Math.max(smin, Math.min(e.s1, reach(e.mx, e.my, c, s, xlim, ylim)));
-    e.s2 = Math.max(smin, Math.min(e.s2, reach(e.mx, e.my, -s, c, xlim, ylim)));
+  // Autofit off: a dragged sd is capped so its handle stays inside the view.
+  function capSd(v, x, y, dx, dy, s, smin) {
+    return Math.max(smin, Math.min(v, reach(x, y, dx, dy, s.xlim, s.ylim)));
   }
 
   var Bivariate = DCR.extend(DCR.Tool, {
@@ -508,13 +506,16 @@
           e.th = st.start.th + st.acc;
         }
         e.s1 = clampSd(st.start.s1 + (r - st.r0), e.s2, smin, smax);
+        // autofit off: keep the dragged handle in view (reachability wins over
+        // the rho ratio near the view edge)
+        if (!this.ui.autofit) e.s1 = capSd(e.s1, e.mx, e.my, Math.cos(e.th), Math.sin(e.th), s, smin);
       } else {
         // signed projection on the (fixed) minor axis, relative to the grab:
         // pulling through the centre stops at the minimum, never mirrors
         var q = (p.x - e.mx) * -Math.sin(e.th) + (p.y - e.my) * Math.cos(e.th);
         e.s2 = clampSd(st.start.s2 + st.sgn * (q - st.q0), e.s1, smin, smax);
+        if (!this.ui.autofit) e.s2 = capSd(e.s2, e.mx, e.my, -Math.sin(e.th), Math.cos(e.th), s, smin);
       }
-      if (!this.ui.autofit) capToView(e, s.xlim, s.ylim, smin);
       this._requestDraw();
     },
 
