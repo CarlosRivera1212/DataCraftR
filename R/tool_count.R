@@ -88,7 +88,7 @@ count_sidebar <- function(options) {
                         min = 1, max = 1e6, step = 1),
     dcr_section("Bars"),
     tags$div(
-      class = "d-flex flex-wrap gap-2",
+      class = "dcr-stack",
       dcr_action_button("align-top", "Align top", "align_top"),
       dcr_action_button("align-middle", "Align middle", "align_middle"),
       dcr_action_button("align-bottom", "Align bottom", "align_bottom")

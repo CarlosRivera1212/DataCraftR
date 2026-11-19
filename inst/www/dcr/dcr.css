@@ -166,6 +166,9 @@ body { background: var(--dcr-panel); color: var(--dcr-ink); overflow: hidden; }
 /* Sidebar action buttons: icon before the label */
 .dcr-act { display: inline-flex; align-items: center; gap: 6px; }
 .dcr-act > svg, .dcr-shape > svg { flex: none; }
+/* Stacked sidebar buttons: full width, icon + label left-aligned */
+.dcr-stack { display: flex; flex-direction: column; gap: 5px; }
+.dcr-stack > .dcr-act { width: 100%; justify-content: flex-start; text-align: left; }
 .dcr-regnote {
   position: absolute; left: 62px; top: 24px; font-size: 11px; color: var(--dcr-muted);
   background: rgba(255, 255, 255, .85); padding: 1px 6px; border-radius: 99px; pointer-events: none;

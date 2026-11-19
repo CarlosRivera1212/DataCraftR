@@ -103,7 +103,7 @@ boxplot_sidebar <- function(options) {
     dcr_fields_input("ctl_ylim", "y range", options$ylim, type = "number"),
     dcr_section("Boxes"),
     tags$div(
-      class = "d-flex gap-2",
+      class = "dcr-stack",
       dcr_action_button("align", "Align medians", "medians"),
       dcr_action_button("reset", "Reset boxes", "reset")
     )

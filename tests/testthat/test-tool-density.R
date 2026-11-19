@@ -114,3 +114,9 @@ test_that("the Density addin is registered", {
   expect_equal(unname(row[1, "Description"]), "Density Curve Data Generator")
   expect_equal(unname(row[1, "Interactive"]), "true")
 })
+
+test_that("the density shape buttons are stacked, not in a row", {
+  html <- htmltools::renderTags(dcr_gadget_ui(density_tool()))$html
+  expect_match(html, 'class="dcr-stack"', fixed = TRUE)
+  expect_match(html, '(?s)class="dcr-stack".*bell.*flat.*skew', perl = TRUE)
+})

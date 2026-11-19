@@ -88,7 +88,7 @@ density_sidebar <- function(options) {
     dcr_fields_input("ctl_xlim", "x range", options$xlim, type = "number"),
     dcr_section("Shape"),
     tags$div(
-      class = "d-flex gap-2",
+      class = "dcr-stack",
       dcr_action_button("bell", "Bell", "normal"),
       dcr_action_button("flat", "Flat", "flat"),
       dcr_action_button("skew", "Skewed", "skew")
