@@ -66,7 +66,7 @@ histogram_tool <- function(options = list()) {
   )
 }
 
-histogram_validate <- function(key, value) {
+histogram_validate <- function(key, value, ...) {
   switch(
     key,
     variables = {

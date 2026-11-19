@@ -59,7 +59,7 @@ bivariate_tool <- function(options = list()) {
   )
 }
 
-bivariate_validate <- function(key, value) {
+bivariate_validate <- function(key, value, ...) {
   switch(
     key,
     groups = {

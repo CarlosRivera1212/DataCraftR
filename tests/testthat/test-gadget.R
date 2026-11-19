@@ -228,7 +228,7 @@ test_that("a tool's validate() transforms control values or blocks them", {
   tool <- new_dcr_tool("scatter", title = "Scatter",
                        sidebar = function(options) shiny::tagList(),
                        controls = c("lim", "mode"),
-                       validate = function(key, value) {
+                       validate = function(key, value, ...) {
                          if (key == "lim") check_range(unlist(value), "lim") else value
                        })
   sent <- list()
@@ -250,6 +250,35 @@ test_that("a tool's validate() transforms control values or blocks them", {
   expect_equal(notes, list(list(
     msg = "lim must be two finite numbers with the first less than the second.",
     type = "error")))
+})
+
+test_that("validate() gets the other controls; a notice warns and is dropped", {
+  tool <- new_dcr_tool("scatter", title = "Scatter",
+                       sidebar = function(options) shiny::tagList(),
+                       controls = c("a", "other"),
+                       validate = function(key, value, ...) {
+                         dots <- list(...)
+                         if (key != "a") return(value)
+                         out <- paste(value, dots$ctl$other)
+                         attr(out, "notice") <- "careful"
+                         out
+                       })
+  sent <- list()
+  notes <- list()
+  local_mocked_bindings(dcr_notify = function(msg, type) {
+    notes[[length(notes) + 1L]] <<- list(msg = msg, type = type)
+  })
+  shiny::testServer(
+    dcr_gadget_server(tool, "console", finish = function(x) NULL), {
+      session$sendInputMessage <- function(inputId, message) {
+        sent[[length(sent) + 1L]] <<- message
+      }
+      session$setInputs(ctl_other = "Z", ctl_a = "init")
+      session$setInputs(ctl_a = "v")
+    })
+  expect_equal(sent[[1]], list(a = "v Z"))
+  expect_null(attr(sent[[1]]$a, "notice"))
+  expect_equal(notes[[1]], list(msg = "careful", type = "warning"))
 })
 
 test_that("new_dcr_tool() validate defaults to the identity", {

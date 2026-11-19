@@ -8,13 +8,16 @@
 #'   `ctl_<key>`.
 #' @param controls Character vector of control keys forwarded to JS.
 #' @param options Named list of initial options passed to the JS tool.
-#' @param validate `function(key, value)` run on each `ctl_<key>` value before
-#'   it is forwarded; returns the value to send to JS, or signals an error
-#'   (shown as a notification; nothing is sent, so JS keeps its old value).
+#' @param validate `function(key, value, ...)` run on each `ctl_<key>` value
+#'   before it is forwarded; `...` carries `ctl`, a named list (names =
+#'   `controls`) of the current raw `ctl_<key>` input values. Returns the value
+#'   to send to JS (a `"notice"` attribute is shown as a warning and dropped),
+#'   or signals an error (shown as a notification; nothing is sent, so JS keeps
+#'   its old value).
 #' @noRd
 new_dcr_tool <- function(name, title, sidebar, controls = character(),
                          options = list(),
-                         validate = function(key, value) value) {
+                         validate = function(key, value, ...) value) {
   stopifnot(is.character(name), length(name) == 1L,
             is.character(title), length(title) == 1L,
             is.function(sidebar), is.character(controls), is.list(options),
@@ -159,11 +162,21 @@ dcr_gadget_server <- function(tool, mode = c("console", "addin"),
     lapply(tool$controls, function(key) {
       id <- paste0("ctl_", key)
       shiny::observeEvent(input[[id]], {
-        value <- tryCatch(list(tool$validate(key, input[[id]])),
-                          error = function(e) {
-                            dcr_notify(conditionMessage(e), "error")
-                            NULL
-                          })
+        value <- tryCatch({
+          ctl <- shiny::isolate(stats::setNames(
+            lapply(tool$controls, function(k) input[[paste0("ctl_", k)]]),
+            tool$controls))
+          v <- tool$validate(key, input[[id]], ctl = ctl)
+          notice <- attr(v, "notice", exact = TRUE)
+          if (!is.null(notice)) {
+            dcr_notify(notice, "warning")
+            attr(v, "notice") <- NULL
+          }
+          list(v)
+        }, error = function(e) {
+          dcr_notify(conditionMessage(e), "error")
+          NULL
+        })
         if (!is.null(value)) {
           session$sendInputMessage("tool", stats::setNames(value, key))
         }

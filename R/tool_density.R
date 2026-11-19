@@ -46,7 +46,7 @@ density_tool <- function(options = list()) {
   )
 }
 
-density_validate <- function(key, value) {
+density_validate <- function(key, value, ...) {
   switch(
     key,
     variables = {

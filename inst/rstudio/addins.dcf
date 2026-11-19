@@ -32,3 +32,8 @@ Name: Mosaic (contingency table)
 Description: Draw an exact two-way contingency table and insert code to load it
 Binding: dcr_mosaic_addin
 Interactive: true
+
+Name: Regression curve
+Description: Draw a regression curve with its error band and insert code to sample it
+Binding: dcr_regression_addin
+Interactive: true

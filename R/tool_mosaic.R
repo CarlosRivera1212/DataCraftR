@@ -69,7 +69,7 @@ mosaic_tool <- function(options = list()) {
   )
 }
 
-mosaic_validate <- function(key, value) {
+mosaic_validate <- function(key, value, ...) {
   switch(
     key,
     cols = mosaic_split_names(value, "cols"),

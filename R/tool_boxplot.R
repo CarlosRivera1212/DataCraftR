@@ -59,7 +59,7 @@ boxplot_tool <- function(options = list()) {
   )
 }
 
-boxplot_validate <- function(key, value) {
+boxplot_validate <- function(key, value, ...) {
   switch(
     key,
     variables = {

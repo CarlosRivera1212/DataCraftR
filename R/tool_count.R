@@ -63,7 +63,7 @@ count_tool <- function(options = list()) {
   )
 }
 
-count_validate <- function(key, value) {
+count_validate <- function(key, value, ...) {
   switch(
     key,
     variables = count_split_names(value, "variables"),

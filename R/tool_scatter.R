@@ -64,7 +64,7 @@ scatter_tool <- function(options = list()) {
   )
 }
 
-scatter_validate <- function(key, value) {
+scatter_validate <- function(key, value, ...) {
   switch(
     key,
     groups = {
