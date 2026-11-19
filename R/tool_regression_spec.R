@@ -14,7 +14,14 @@ regression_names <- function(names) {
 # groups x K numeric matrix from a matrix, a list of per-group vectors or a
 # plain vector (one group).
 regression_matrix <- function(v, what, k) {
-  if (is.list(v)) v <- do.call(rbind, lapply(v, function(r) as.numeric(unlist(r))))
+  if (is.list(v)) {
+    rows <- lapply(v, function(r) as.numeric(unlist(r)))
+    if (length(unique(lengths(rows))) != 1L) {
+      stop(what, " must have the same length (grid points) in every group.",
+           call. = FALSE)
+    }
+    v <- do.call(rbind, rows)
+  }
   if (!is.numeric(v)) stop(what, " must be numeric.", call. = FALSE)
   if (!is.matrix(v)) v <- matrix(v, nrow = 1L)
   if (nrow(v) != k) {
@@ -107,9 +114,10 @@ spec_stats.dcr_spec_regression <- function(spec) {
     es2 <- mean(sx^2)
     cov_xf <- mean(xm * fx) - mean(xm) * ef
     vy <- vf + es2
-    degenerate <- !(vy > 1e-12 * max(1, ef^2, es2))
+    scale <- ef^2 + es2 + mean(fx^2)
+    degenerate <- if (scale == 0) vy <= 0 else vy <= 1e-12 * scale
     c(mean_x, sd_x, ef, sqrt(max(vy, 0)),
-      if (degenerate) NA_real_ else cov_xf / (sd_x * sqrt(vy)),
+      if (degenerate) NA_real_ else max(-1, min(1, cov_xf / (sd_x * sqrt(vy)))),
       if (degenerate) NA_real_ else max(vf, 0) / vy)
   })
   r <- do.call(rbind, rows)

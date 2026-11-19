@@ -96,7 +96,7 @@ test_that("zero error and constant curves", {
   expect_true(is.na(st$r2_curve))
   df0 <- dcr_sample(one(rep(4, K), rep(0, K)), n = 10, seed = 1)
   expect_true(all(df0$y == 4))
-  # constant f with error: r is 0, r2_curve 0
+  # constant f with error: r2_curve 0
   st2 <- spec_stats(one(rep(4, K), rep(1, K)))
   expect_equal(st2$r2_curve, 0, tolerance = 1e-8)
 })
@@ -116,4 +116,54 @@ test_that("validation errors", {
   expect_error(rg(groups = c("A", "A")), "unique")
   expect_error(rg(shared_x = "yes"), "shared_x")
   expect_error(rg(names = list(x = "a", y = "a", group = "g")), "unique")
+})
+
+test_that("JSON-shaped input: list of vectors, list of lists, ragged, big K", {
+  base <- list(tool = "regression", groups = c("A", "B"),
+               names = list(x = "x", y = "y", group = "group"),
+               xlim = c(0, 10), n = 10)
+  fv <- list(xs_grid, 10 - xs_grid)
+  sv <- list(rep(1, K), rep(2, K))
+  sp <- as_dcr_spec(c(base, list(f = fv, s = sv)))
+  expect_equal(dim(sp$f), c(2L, K))
+  expect_equal(sp$s[2, 1], 2)
+  fl <- lapply(fv, as.list)
+  sl <- lapply(sv, as.list)
+  sp2 <- as_dcr_spec(c(base, list(f = fl, s = sl)))
+  expect_equal(sp2$f, sp$f)
+  expect_error(as_dcr_spec(c(base, list(f = list(xs_grid, xs_grid[1:67]),
+                                         s = sv))), "grid points|same length")
+  big <- list(rep(1, 1002), rep(1, 1002))
+  expect_error(as_dcr_spec(c(base, list(f = big, s = big))), "grid points")
+})
+
+test_that("stats edge cases", {
+  # per-group curves: correlation signs differ
+  st <- spec_stats(rg())
+  expect_gt(st$r[1], 0)
+  expect_lt(st$r[2], 0)
+  # cone s: E[s^2], not mean(s)^2
+  s <- 0.1 + 0.9 * xs_grid / 10
+  st <- spec_stats(one(rep(0, K), s))
+  es2 <- mean((0.1 + 0.9 * seq(0, 1, length.out = 1e5))^2)
+  expect_equal(st$sd_y, sqrt(es2), tolerance = 1e-4)
+  # tiny scale is not NA
+  st <- spec_stats(one(1e-8 * xs_grid, rep(1e-8, K)))
+  expect_false(is.na(st$r))
+  expect_false(is.na(st$r2_curve))
+  expect_equal(st$r2_curve, (100 / 12) / (100 / 12 + 1), tolerance = 1e-3)
+  # s = 0 with non-constant f
+  st <- spec_stats(one(xs_grid, rep(0, K)))
+  expect_equal(st$r, 1, tolerance = 1e-6)
+  expect_lte(st$r, 1)
+  expect_equal(st$r2_curve, 1, tolerance = 1e-8)
+  # constant f with error: no correlation
+  st <- spec_stats(one(rep(4, K), rep(1, K)))
+  expect_lt(abs(st$r), 1e-12)
+})
+
+test_that("seeds reproduce with unshared x", {
+  a <- dcr_sample(rg(shared_x = FALSE), n = 20, seed = 9)
+  b <- dcr_sample(rg(shared_x = FALSE), n = 20, seed = 9)
+  expect_identical(a, b)
 })
