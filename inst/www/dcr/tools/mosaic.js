@@ -557,7 +557,7 @@
       if (!dom || !geo || !dom.stats) return;
       this._drawStats();
       var ph = dom.stats.offsetHeight;
-      if (ph > 0 && Math.abs(ph - (this._statsH || STATS_H)) >= 1) {
+      if (ph > 0 && !this._stroke && Math.abs(ph - (this._statsH || STATS_H)) >= 1) {
         this._statsH = ph;                 // the panel changed height: re-fit the plot
         this._layout();
         geo = this._geo;

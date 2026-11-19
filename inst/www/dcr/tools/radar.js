@@ -131,6 +131,8 @@
 
   // Exact mean and sd of a normal(mean, sd) truncated to [a, b] (same rules
   // as R's tnorm_moments(): uniform moments when sd is huge for the range).
+  // The degenerate branches below are unreachable with in-range means (R flips
+  // such cases instead).
   function tnormMoments(mean, sd, a, b) {
     if (!(sd > 0)) return { mean: mean, sd: 0 };
     var za = (a - mean) / sd, zb = (b - mean) / sd;
@@ -321,6 +323,18 @@
           return v ? v[0] : null;
       }
       return null;
+    },
+
+    // Done flush: ranges first, so pairs map to the old variable names even
+    // when the variable count changes in the same flush.
+    flushControls: function (values) {
+      var self = this, vals = values || {}, keys = Object.keys(vals);
+      keys.sort(function (a, b) { return (a === "ranges" ? 0 : 1) - (b === "ranges" ? 0 : 1); });
+      keys.forEach(function (key) {
+        try {
+          if (self.controlValue(key, vals[key]) !== null) self.setControl(key, vals[key]);
+        } catch (e) { /* ignored: Done must still send the spec */ }
+      });
     },
 
     setControl: function (key, value) {
@@ -681,7 +695,7 @@
 
     // Everything relative to the press (dx, dy in px since the press).
     _applyDrag: function (st, dx, dy) {
-      var s = this.state, i = st.i, k = st.k, p = s.variables.length, k2, d, w, lo, hi;
+      var s = this.state, i = st.i, k = st.k, p = s.variables.length, k2, d, w, lo, hi, px;
       var R = this._geo.R, v = [dx, dy];
       function move(j) {
         w = s.ranges[j][1] - s.ranges[j][0];
@@ -696,8 +710,9 @@
         move(k2);
       } else {
         w = s.ranges[k][1] - s.ranges[k][0];
-        d = project(v, spokeAngle(k, p)) / R * w;
-        if (st.sign === 0 && d !== 0) st.sign = d > 0 ? 1 : -1;   // first movement picks
+        px = project(v, spokeAngle(k, p));
+        d = px / R * w;
+        if (st.sign === 0 && Math.abs(px) >= 2) st.sign = px > 0 ? 1 : -1;   // first real movement picks
         s.sd[i][k] = clamp(st.s0[k] + st.sign * d, 0, w / 2);
       }
     },

@@ -3128,6 +3128,10 @@ run_check("Radar spread", engine("radar"), paste0(rd_script, "
     ok.push(t.state.sd[0][2] === 0 && finite(t));
     t = sp({sd: z}); drag(t, [a, add(a, along(t, 2, -10)), add(a, along(t, 2, -20))]);
     ok.push(near(t.state.sd[0][2], 2));
+    // a sideways wiggle (< 2 px along the spoke) does not lock the direction
+    t = sp({sd: z}); var an = t._ang(2), pp = [-5 * Math.sin(an), 5 * Math.cos(an)];
+    drag(t, [a, add(add(a, pp), along(t, 2, 1)), add(a, along(t, 2, -6))]);
+    ok.push(near(t.state.sd[0][2], 0.6) && finite(t));
     // pressed again after growing from 0, the handles are apart and the outer one is grabbed
     a = t._outPt(0, 2); ok.push(t._hit(a).sign === 1);
     // a tiny sd (handles within 4 px) behaves like sd = 0
@@ -3477,6 +3481,15 @@ run_check("Radar Done flush", engine("radar"), paste0(flush_script, "
     sidebar = {n: 10};
     ok.push(doneSpec(d) !== null);
     d.setControl = orig;
+    // ranges and variables edited in the same flush: ranges map to the old names
+    d = mkr();
+    sidebar = {variables: 'a, b, c, d, e', ranges: [0, 10, 0, 10, 0, 10, 0, 10, 0, 100]};
+    var s5 = doneSpec(d);
+    ok.push(s5 !== null && s5.variables.join() === 'a,b,c,d,e' && s5.ranges[4].join() === '0,100');
+    d = mkr();
+    sidebar = {variables: 'v1, v2, v3, v4, v5, v6', ranges: [0, 10, 0, 10, 0, 10, 0, 10, 0, 100]};
+    var s6 = doneSpec(d);
+    ok.push(s6 !== null && s6.variables.length === 6 && s6.ranges[4].join() === '0,100');
     // a variable rename typed just before Done is part of the spec
     d = mkr();
     sidebar = {variables: 'a, b, c, d, e'};

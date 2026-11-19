@@ -3,9 +3,8 @@
 **DataCraftR** turns a drawing into a data set. Sketch a scatter plot, a
 histogram, a smooth density curve, a bivariate normal ellipse, a regression
 curve with its error band, a boxplot, a set of count bars or a contingency
-table in an interactive gadget, press
-**Done**, and get a `data.frame` back, together with a reproducible
-specification that regenerates the same data.
+table in an interactive gadget, press **Done**, and get a `data.frame` back,
+together with a reproducible specification that regenerates the same data.
 
 It is meant for teaching and for testing algorithms: you decide the shape of
 the data, and R gives you the numbers.

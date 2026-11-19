@@ -175,3 +175,9 @@ test_that("the regression UI loads its tool script", {
   deps <- vapply(html$dependencies, function(d) paste(d$script, collapse = " "), "")
   expect_true(any(grepl("tools/regression.js", deps, fixed = TRUE)))
 })
+
+test_that("regression_eval() wraps errors from a user function", {
+  xs <- seq(0, 10, length.out = 201)
+  expect_error(regression_eval(function(x) stop("boom"), xs),
+               "Invalid equation: boom")
+})

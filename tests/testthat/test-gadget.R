@@ -281,6 +281,34 @@ test_that("validate() gets the other controls; a notice warns and is dropped", {
   expect_equal(notes[[1]], list(msg = "careful", type = "warning"))
 })
 
+test_that("a dcr_skip condition from validate() sends nothing and is silent", {
+  tool <- new_dcr_tool("scatter", title = "Scatter",
+                       sidebar = function(options) shiny::tagList(),
+                       controls = c("a"),
+                       validate = function(key, value, ...) {
+                         if (identical(value, "skip")) {
+                           stop(structure(class = c("dcr_skip", "error", "condition"),
+                                          list(message = "skip", call = NULL)))
+                         }
+                         value
+                       })
+  sent <- list()
+  notes <- list()
+  local_mocked_bindings(dcr_notify = function(msg, type) {
+    notes[[length(notes) + 1L]] <<- list(msg = msg, type = type)
+  })
+  shiny::testServer(
+    dcr_gadget_server(tool, "console", finish = function(x) NULL), {
+      session$sendInputMessage <- function(inputId, message) {
+        sent[[length(sent) + 1L]] <<- message
+      }
+      session$setInputs(ctl_a = "init")
+      session$setInputs(ctl_a = "skip")
+    })
+  expect_equal(sent, list())
+  expect_equal(notes, list())
+})
+
 test_that("new_dcr_tool() validate defaults to the identity", {
   expect_equal(helper_tool()$validate("x", list(1, 2)), list(1, 2))
   expect_error(new_dcr_tool("a", "A", function(o) NULL, validate = "no"))

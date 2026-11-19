@@ -10,7 +10,12 @@ regression_k <- 201L
 # finite value and set attr "notice". Errors if nothing usable results.
 regression_eval <- function(f, xs) {
   y <- if (is.function(f)) {
-    suppressWarnings(f(xs))
+    tryCatch(
+      suppressWarnings(f(xs)),
+      error = function(e) {
+        stop("Invalid equation: ", conditionMessage(e), call. = FALSE)
+      }
+    )
   } else {
     if (!is.character(f) || length(f) != 1L || is.na(f) || !nzchar(trimws(f))) {
       stop("The equation must be a single non-empty string or a function.",
@@ -89,7 +94,7 @@ regression_options <- function(f, groups, n, xlim, sd, names, shared_x) {
     fm[i, ] <- as.numeric(y)
   }
   sm <- matrix(sd, nrow = k, ncol = regression_k)
-  list(groups = groups, n = n, xlim = xlim, f = fm, s = sm, level = sd[1],
+  list(groups = groups, n = n, xlim = xlim, f = fm, s = sm, level = max(sm[1, ]),
        level_max = max(1, 2 * max(sd), diff(range(fm)) / 2),
        names = regression_names(names), shared_x = shared_x)
 }
