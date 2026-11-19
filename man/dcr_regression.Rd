@@ -44,6 +44,10 @@ Opens the Regression gadget. Shape the mean curve \code{f(x)} and the error
 spread around it for each group (\strong{Pull} and \strong{Paint} brushes, or type an
 equation), then press \strong{Done} to get a random sample of size \code{n} per group.
 }
+\details{
+An equation given as a string or function is evaluated in R in
+your session, like any other R code you run.
+}
 \examples{
 if (interactive()) {
   df <- dcr_regression("2 + 0.5 * x", groups = c("control", "treated"))

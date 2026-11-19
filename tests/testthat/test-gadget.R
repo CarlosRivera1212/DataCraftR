@@ -298,6 +298,19 @@ test_that("dcr_seg_input() marks the selected choice and colours", {
   expect_match(html, ">B</span>", fixed = TRUE)
 })
 
+test_that("dcr_seg_input() draws icons and keeps the labels accessible", {
+  icon <- htmltools::tags$svg(class = "ic")
+  html <- as.character(dcr_seg_input("ctl_mode", NULL,
+                                     c(Pull = "pull", Paint = "paint"),
+                                     icons = list(pull = icon),
+                                     aria_label = "Mode"))
+  expect_match(html, '<svg class="ic"></svg>', fixed = TRUE)
+  expect_match(html, 'title="Pull"', fixed = TRUE)
+  expect_match(html, 'aria-label="Pull"', fixed = TRUE)
+  expect_match(html, ">Paint</span>", fixed = TRUE)
+  expect_no_match(html, 'title="Paint"', fixed = TRUE)
+})
+
 test_that("dcr_fields_input() builds keyed or unkeyed fields", {
   html <- as.character(dcr_fields_input("ctl_xlim", "x", c(0, 10), type = "number"))
   expect_match(html, 'id="ctl_xlim"', fixed = TRUE)

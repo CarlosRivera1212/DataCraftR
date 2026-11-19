@@ -13,7 +13,7 @@
 #'   `controls`) of the current raw `ctl_<key>` input values. Returns the value
 #'   to send to JS (a `"notice"` attribute is shown as a warning and dropped),
 #'   or signals an error (shown as a notification; nothing is sent, so JS keeps
-#'   its old value).
+#'   its old value). A condition of class `dcr_skip` drops the value silently.
 #' @noRd
 new_dcr_tool <- function(name, title, sidebar, controls = character(),
                          options = list(),
@@ -39,15 +39,22 @@ dcr_section <- function(label) {
 #'   button labels.
 #' @param colors Optional colours drawn as a dot before each label.
 #' @param aria_label Accessible name, for when `label` is `NULL`.
+#' @param icons Optional named list of inline SVG tags, keyed by choice value;
+#'   an icon is drawn before the label, and the button also gets the label as
+#'   its `title` and `aria-label`.
 #' @noRd
 dcr_seg_input <- function(id, label, choices, selected = choices[[1]],
-                          colors = NULL, aria_label = label) {
+                          colors = NULL, aria_label = label, icons = NULL) {
   tags <- htmltools::tags
   labels <- names(choices) %||% choices
   buttons <- lapply(seq_along(choices), function(i) {
+    icon <- icons[[choices[[i]]]]
     tags$button(
       type = "button", `data-value` = choices[[i]],
       `aria-pressed` = if (identical(choices[[i]], selected)) "true" else "false",
+      title = if (!is.null(icon)) labels[[i]],
+      `aria-label` = if (!is.null(icon)) labels[[i]],
+      icon,
       if (!is.null(colors)) {
         tags$span(class = "dcr-dot", style = paste0("background:", colors[[i]]))
       },
@@ -173,6 +180,8 @@ dcr_gadget_server <- function(tool, mode = c("console", "addin"),
             attr(v, "notice") <- NULL
           }
           list(v)
+        }, dcr_skip = function(e) {
+          NULL
         }, error = function(e) {
           dcr_notify(conditionMessage(e), "error")
           NULL

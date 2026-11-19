@@ -108,3 +108,64 @@ test_that("undefined equations warn and still apply; all-undefined is refused", 
   expect_true(all(is.finite(sent[[1]]$equation$f)))
   expect_equal(vapply(notes, `[[`, "", "type"), c("warning", "error"))
 })
+
+test_that("regression_options() accepts functions and per-group equations", {
+  nm <- c(x = "x", y = "y", group = "g")
+  o <- regression_options(function(x) x^2, "A", 50, c(0, 10), 1, nm, TRUE)
+  expect_equal(o$f[1, ], seq(0, 10, length.out = 201)^2)
+  o <- regression_options(list("x", function(x) 10 - x), c("A", "B"), 50,
+                          c(0, 10), 1, nm, TRUE)
+  xs <- seq(0, 10, length.out = 201)
+  expect_equal(o$f[1, ], xs)
+  expect_equal(o$f[2, ], 10 - xs)
+  expect_error(regression_options("x", "A", 50, c(0, 10), 1, nm, NA),
+               "shared_x")
+  expect_error(regression_options("x", "A", 50, c(0, 10), 1, nm, "yes"),
+               "shared_x")
+})
+
+test_that("level_max covers the f range of all groups", {
+  nm <- c(x = "x", y = "y", group = "g")
+  o <- regression_options(list("x", "100 * x"), c("A", "B"), 50, c(0, 10), 1,
+                          nm, TRUE)
+  expect_equal(o$level_max, 500)
+})
+
+test_that("undefined-x warnings name the group", {
+  nm <- c(x = "x", y = "y", group = "g")
+  expect_warning(
+    regression_options(list("x", "log(x)"), c("A", "B"), 50, c(0, 10), 1,
+                       nm, TRUE),
+    "group B: the equation is undefined for some x; nearest values were used.",
+    fixed = TRUE)
+})
+
+test_that("a cleared equation field is ignored silently", {
+  tool <- regression_tool()
+  sent <- list()
+  notes <- list()
+  local_mocked_bindings(dcr_notify = function(msg, type) {
+    notes[[length(notes) + 1L]] <<- msg
+  })
+  shiny::testServer(
+    dcr_gadget_server(tool, "console", finish = function(x) NULL), {
+      session$sendInputMessage <- function(inputId, message) {
+        sent[[length(sent) + 1L]] <<- message
+      }
+      session$setInputs(ctl_xlim = list(0, 10), ctl_equation = "x")
+      session$setInputs(ctl_equation = "   ")
+    })
+  expect_length(sent, 0L)
+  expect_length(notes, 0L)
+})
+
+test_that("the sidebar defaults: Show sample off, spec example buttons", {
+  html <- htmltools::renderTags(dcr_gadget_ui(regression_tool()))$html
+  expect_match(html, '<input id="ctl_show" type="checkbox" class="shiny-input-checkbox"/>', fixed = TRUE)
+  ex <- regmatches(html, gregexpr('data-equation="[^"]*"', html))[[1]]
+  expect_equal(ex, paste0('data-equation="',
+                          c("x", "sin(x)", "log(x)", "exp(x/3)", "x^2/10"),
+                          '"'))
+  expect_match(html, 'aria-label="Pull"', fixed = TRUE)
+  expect_match(html, 'aria-label="Error"', fixed = TRUE)
+})

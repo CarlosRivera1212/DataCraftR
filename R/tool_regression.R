@@ -82,12 +82,15 @@ regression_options <- function(f, groups, n, xlim, sd, names, shared_x) {
   for (i in seq_len(k)) {
     y <- regression_eval(eqs[[i]], xs)
     notice <- attr(y, "notice", exact = TRUE)
-    if (!is.null(notice)) warning(notice, call. = FALSE)
+    if (!is.null(notice)) {
+      warning("group ", groups[i], ": the equation is undefined for some x; ",
+              "nearest values were used.", call. = FALSE)
+    }
     fm[i, ] <- as.numeric(y)
   }
   sm <- matrix(sd, nrow = k, ncol = regression_k)
   list(groups = groups, n = n, xlim = xlim, f = fm, s = sm, level = sd[1],
-       level_max = max(1, 2 * max(sd), diff(range(fm[1, ])) / 2),
+       level_max = max(1, 2 * max(sd), diff(range(fm)) / 2),
        names = regression_names(names), shared_x = shared_x)
 }
 
@@ -109,6 +112,8 @@ regression_options <- function(f, groups, n, xlim, sd, names, shared_x) {
 #'   each at least 0.
 #' @param names Column names for x, y and group: a character vector of
 #'   length 3, named `x`, `y`, `group` or in that order.
+#' @details An equation given as a string or function is evaluated in R in
+#'   your session, like any other R code you run.
 #' @param shared_x If `TRUE` all groups share the same x values.
 #' @return A data.frame with x, y and a group factor whose levels are the
 #'   groups, carrying its spec (see [dcr_spec()]); `NULL` invisibly on Cancel.
@@ -165,10 +170,16 @@ regression_validate <- function(key, value, ctl = list(), ...) {
     n = histogram_check_n(unlist(value)),
     names = regression_names(unlist(value)),
     equation = {
+      txt <- as.character(unlist(value))
+      if (length(txt) == 0L || is.na(txt[1]) || !nzchar(trimws(txt[1]))) {
+        # A cleared field: nothing to apply, nothing to complain about.
+        stop(structure(class = c("dcr_skip", "error", "condition"),
+                       list(message = "", call = NULL)))
+      }
       # Evaluate on the grid of the xlim currently in the sidebar.
       xlim <- check_range(as.numeric(unlist(ctl$xlim)), "xlim")
       xs <- seq(xlim[1], xlim[2], length.out = regression_k)
-      y <- regression_eval(as.character(unlist(value)), xs)
+      y <- regression_eval(txt[1], xs)
       out <- list(f = as.numeric(y))
       notice <- attr(y, "notice", exact = TRUE)
       if (!is.null(notice)) attr(out, "notice") <- notice
@@ -186,6 +197,18 @@ regression_icon <- function(d) {
     height = "14", `aria-hidden` = "true", focusable = "false",
     tags$path(d = d, fill = "none", stroke = "currentColor",
               `stroke-width` = "1.6", `stroke-linecap` = "round")
+  )
+}
+
+# 20 x 20 glyph for the segmented controls (prototype glyphs).
+regression_seg_icon <- function(d, fill = FALSE) {
+  tags <- htmltools::tags
+  tags$svg(
+    xmlns = "http://www.w3.org/2000/svg", viewBox = "0 0 20 20", width = "20",
+    height = "20", `aria-hidden` = "true", focusable = "false", fill = "none",
+    stroke = "currentColor", `stroke-width` = "1.5", `stroke-linecap` = "round",
+    `stroke-linejoin` = "round",
+    tags$path(d = d, fill = if (fill) "currentColor", `fill-opacity` = if (fill) "0.15")
   )
 }
 
@@ -212,10 +235,19 @@ regression_sidebar <- function(options) {
                      paste(groups, collapse = ", "), updateOn = "blur"),
     dcr_section("Edit"),
     dcr_seg_input("ctl_target", NULL, c(Curve = "curve", Error = "error"),
-                  selected = options$target, aria_label = "Edit target"),
+                  selected = options$target, aria_label = "Edit target",
+                  icons = list(curve = regression_seg_icon(
+                    "M2 16 C8 16 9 5 18 4"),
+                    error = regression_seg_icon(
+                      "M2 12 C8 12 9 4 18 3 L18 10 C9 11 8 19 2 19 Z",
+                      fill = TRUE))),
     dcr_section("Mode"),
     dcr_seg_input("ctl_mode", NULL, c(Pull = "pull", Paint = "paint"),
-                  selected = options$mode, aria_label = "Brush mode"),
+                  selected = options$mode, aria_label = "Brush mode",
+                  icons = list(pull = regression_seg_icon(
+                    "M10 3 V17 M6.5 6.5 L10 3 L13.5 6.5 M6.5 13.5 L10 17 L13.5 13.5"),
+                    paint = regression_seg_icon(
+                      "M17 3 L10 10 M10 10 C6.5 9.5 5 12.5 3.5 17 C8 16.5 11 15 10.5 11.5"))),
     shiny::sliderInput("ctl_brush",
                        tags$span("Brush ", tags$span(class = "dcr-kbd", "[ ]")),
                        min = 0.005, max = 1, value = options$brush,
@@ -225,8 +257,8 @@ regression_sidebar <- function(options) {
       tags$summary("Equation"),
       shiny::textInput("ctl_equation", "y =", value = "", updateOn = "blur"),
       tags$div(class = "d-flex flex-wrap gap-1 mb-2",
-               example("x"), example("sin(x)"), example("x^2 / 10"),
-               example("exp(x / 5)")),
+               example("x"), example("sin(x)"), example("log(x)"),
+               example("exp(x/3)"), example("x^2/10")),
       tags$button(type = "button", class = "btn btn-primary btn-sm",
                   `data-dcr-action` = "apply-equation", "Apply")
     ),
@@ -255,7 +287,7 @@ regression_sidebar <- function(options) {
                           value = options$n, min = 1, max = 1e6, step = 1),
       shiny::checkboxInput("ctl_shared_x", "Same x for all groups",
                            value = isTRUE(options$shared_x)),
-      shiny::checkboxInput("ctl_show", "Show sample", value = TRUE),
+      shiny::checkboxInput("ctl_show", "Show sample", value = FALSE),
       tags$button(type = "button", class = "btn btn-light btn-sm",
                   `data-dcr-action` = "resample", "Resample"),
       dcr_fields_input("ctl_names", "Names", unlist(options$names))
