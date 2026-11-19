@@ -12,7 +12,7 @@ test_that("radar_tool() forwards the radar controls", {
                  "integers", "group_name"))
 })
 
-test_that("the radar UI has its controls, details, actions and script", {
+test_that("the radar UI has its controls, details and actions", {
   rendered <- htmltools::renderTags(dcr_gadget_ui(radar_tool()))
   html <- rendered$html
   expect_match(html, 'data-tool="radar"', fixed = TRUE)
@@ -126,6 +126,10 @@ test_that("radar control values are validated before reaching JS", {
   expect_error(v("group_name", "a, b"), "single")
   expect_error(v("group_name", "v1", ctl = list(variables = "v1, v2, v3")),
                "differ")
+  expect_error(v("variables", "a, b, group", ctl = list(group_name = "group")),
+               "group column")
+  expect_equal(v("variables", "a, b, c", ctl = list(group_name = "group")),
+               c("a", "b", "c"))
   expect_equal(v("target", "spread"), "spread")
   r <- v("ranges", list(0, 10, -5, 5, 1, 2))
   expect_equal(r, list(c(0, 10), c(-5, 5), c(1, 2)))
@@ -144,6 +148,8 @@ test_that("an invalid ctl_ranges is notified and not forwarded", {
       session$sendInputMessage <- function(inputId, message) {
         sent[[length(sent) + 1L]] <<- message
       }
+      # The first setInputs is swallowed by ignoreInit (it only seeds the
+      # observer), so nothing is validated or sent for it.
       session$setInputs(ctl_ranges = list(0, 10, 0, 10, 0, 10))
       session$setInputs(ctl_ranges = list(0, 10, 7, 3, 0, 10))
       session$setInputs(ctl_ranges = list(0, 10, "x", 3, 0, 10))

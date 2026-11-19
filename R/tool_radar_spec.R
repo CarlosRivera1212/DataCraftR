@@ -21,10 +21,21 @@ radar_matrix <- function(v, what, nrow, ncol, row_what, col_what) {
     if (length(unique(lengths(rows))) != 1L) {
       stop(what, " must have the same length in every row.", call. = FALSE)
     }
-    v <- do.call(rbind, rows)
+    if (all(lengths(rows) == 1L) && length(rows) == nrow * ncol) {
+      # Flat list of scalars (one group collapsed by JSON).
+      v <- unlist(rows)
+    } else {
+      v <- do.call(rbind, rows)
+    }
   }
   if (!is.numeric(v)) stop(what, " must be numeric.", call. = FALSE)
-  if (!is.matrix(v)) v <- matrix(v, nrow = nrow, byrow = TRUE)
+  if (!is.matrix(v)) {
+    if (length(v) != nrow * ncol) {
+      stop(what, " must have one row per ", row_what, " and one column per ",
+           col_what, ".", call. = FALSE)
+    }
+    v <- matrix(v, nrow = nrow, byrow = TRUE)
+  }
   if (nrow(v) != nrow) {
     stop(what, " must have one row per ", row_what, ".", call. = FALSE)
   }
@@ -107,6 +118,10 @@ tnorm_moments <- function(mean, sd, a, b) {
   if (sd == 0) return(c(mean = mean, sd = 0))
   za <- (a - mean) / sd
   zb <- (b - mean) / sd
+  # sd huge against the range: the truncated normal is uniform.
+  if (zb - za < 1e-3) {
+    return(c(mean = (a + b) / 2, sd = (b - a) / sqrt(12)))
+  }
   flip <- za + zb > 0
   if (flip) {
     t <- za

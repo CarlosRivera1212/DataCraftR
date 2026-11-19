@@ -21,6 +21,9 @@ test_that("sampler stays in range and matches the truncated moments", {
   st <- spec_stats(spec)
   expect_equal(names(st), c("group", "variable", "mean", "sd"))
   expect_equal(nrow(st), 8)
+  # group-major row order
+  expect_equal(st$group, rep(c("A", "B"), each = 4))
+  expect_equal(st$variable, rep(spec$variables, times = 2))
   for (j in 1:4) {
     r <- spec$ranges[j, ]
     w <- diff(r)
@@ -66,6 +69,12 @@ test_that("tnorm_moments matches a large simulation", {
   }
   expect_equal(tnorm_moments(4, 0, 0, 10), c(mean = 4, sd = 0))
   expect_equal(tnorm_moments(5, 1, 0, 10)[["mean"]], 5)
+  # sd huge against the range: uniform moments
+  for (big in c(1e6, 1e9)) {
+    m <- tnorm_moments(3, big, 0, 10)
+    expect_equal(m[["mean"]], 5)
+    expect_equal(m[["sd"]], 10 / sqrt(12), tolerance = 1e-6)
+  }
 })
 
 test_that("sd = 0 gives a constant column", {
@@ -117,6 +126,12 @@ test_that("one group x three variables sent as flat vectors is accepted", {
               mean = list(list(5, 5, 5)), sd = list(list(1, 1, 1)))
   expect_equal(spec2$mean, spec$mean)
   expect_equal(spec2$ranges, spec$ranges)
+  spec3 <- rd(groups = "A", variables = c("x", "y", "z"),
+              ranges = list(0, 10, 0, 10, 0, 10), mean = list(5, 5, 5),
+              sd = list(1, 1, 1))
+  expect_equal(spec3$mean, spec$mean)
+  expect_equal(spec3$ranges, spec$ranges)
+  expect_equal(spec3$sd, spec$sd)
 })
 
 test_that("validation errors", {
@@ -134,12 +149,16 @@ test_that("validation errors", {
   expect_equal(ncol(ok$mean), 12L)
   expect_error(rd(variables = c("a", "a", "b", "c")), "unique")
   expect_error(rd(groups = LETTERS[1:11]), "groups")
-  expect_error(rd(mean = list(c(11, 0, 150, 0.5), c(7, 2, 120, 0.3))), "range")
-  expect_error(rd(mean = list(c(4, 0, 150, -0.5), c(7, 2, 120, 0.3))), "range")
-  expect_error(rd(sd = list(c(-1, 1, 15, 0.1), c(2, 0.5, 10, 0.2))), "sd")
-  expect_error(rd(sd = list(c(NA, 1, 15, 0.1), c(2, 0.5, 10, 0.2))), "sd")
+  expect_error(rd(mean = list(c(11, 0, 150, 0.5), c(7, 2, 120, 0.3))),
+               "mean must lie within")
+  expect_error(rd(mean = list(c(4, 0, 150, -0.5), c(7, 2, 120, 0.3))),
+               "mean must lie within")
+  expect_error(rd(sd = list(c(-1, 1, 15, 0.1), c(2, 0.5, 10, 0.2))),
+               "sd must be finite")
+  expect_error(rd(sd = list(c(NA, 1, 15, 0.1), c(2, 0.5, 10, 0.2))),
+               "sd must be finite")
   expect_error(rd(ranges = list(c(0, 10), c(5, -5), c(100, 200), c(0, 1))),
-               "ranges")
+               "ranges\\[2\\]")
   expect_error(rd(group_name = "v2"), "group_name")
   expect_error(rd(group_name = ""), "group_name")
   expect_error(rd(n = 4e5, groups = c("A", "B", "C"),

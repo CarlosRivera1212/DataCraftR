@@ -128,7 +128,14 @@ radar_validate <- function(key, value, ctl = list(), ...) {
   switch(
     key,
     groups = check_names(radar_split(value), "groups"),
-    variables = radar_variables(radar_split(value)),
+    variables = {
+      vars <- radar_variables(radar_split(value))
+      g <- tryCatch(radar_split(ctl$group_name), error = function(e) character())
+      if (length(g) == 1L && g %in% vars) {
+        stop("variables must differ from the group column name.", call. = FALSE)
+      }
+      vars
+    },
     n = histogram_check_n(unlist(value)),
     group_name = {
       g <- check_names(radar_split(value), "group_name")
