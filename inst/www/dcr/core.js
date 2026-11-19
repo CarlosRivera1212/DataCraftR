@@ -272,6 +272,7 @@
     var id = btn.getAttribute("aria-controls");
     var body = id && root.document ? root.document.getElementById(id) : null;
     if (body) body.hidden = !open;
+    if (open && body && root.jQuery) root.jQuery(body).trigger("shown");
     if (DCR.current) DCR.current.render();
     return open;
   };

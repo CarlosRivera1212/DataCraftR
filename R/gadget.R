@@ -220,20 +220,20 @@ dcr_gadget_server <- function(tool, mode = c("console", "addin"),
       finish(value)
     }
 
-    output$n <- shiny::renderText({
+    n_text <- shiny::reactive({
       shiny::req(input$tool, !inherits(input$tool, "dcr_spec_error"))
       paste0("n = ", spec_n(input$tool))
     })
-    output$n_sum <- shiny::renderText({
-      shiny::req(input$tool, !inherits(input$tool, "dcr_spec_error"))
-      paste0("n = ", spec_n(input$tool))
-    })
+    output$n <- shiny::renderText(n_text())
+    output$n_sum <- shiny::renderText(n_text())
     output$stats <- shiny::renderTable({
       spec <- shiny::req(input$tool)
       shiny::validate(shiny::need(!inherits(spec, "dcr_spec_error"),
                                   spec$message))
       spec_stats(spec)
     }, digits = 2, na = "")
+    # The panel starts hidden; keep the table current so it is fresh on open.
+    shiny::outputOptions(output, "stats", suspendWhenHidden = FALSE)
 
     # Returns the data frame to finish with, or NULL to stay open.
     done <- function(spec) {

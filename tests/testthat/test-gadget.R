@@ -372,3 +372,9 @@ test_that("the summary output shows the current n", {
     expect_equal(output$n_sum, "n = 10")
   })
 })
+
+test_that("the stats output is not suspended while the panel is collapsed", {
+  src <- paste(deparse(dcr_gadget_server), collapse = "\n")
+  expect_match(src, 'outputOptions(output, "stats", suspendWhenHidden = FALSE)',
+               fixed = TRUE)
+})

@@ -89,6 +89,14 @@ run_check("DCR.toggleStats", engine(), "
     ok.push(renders === 1);
     ok.push(DCR.toggleStats(btn) === false && attrs['aria-expanded'] === 'false');
     ok.push(renders === 2);
+    var shown = 0, el = {hidden: true};
+    window.jQuery = function (x) { return {trigger: function (e) { if (x === el && e === 'shown') shown++; }}; };
+    window.document = {getElementById: function () { return el; }};
+    DCR.toggleStats(btn);                       // open: body shown + trigger
+    ok.push(el.hidden === false && shown === 1);
+    DCR.toggleStats(btn);                       // close: no trigger
+    ok.push(el.hidden === true && shown === 1);
+    delete window.jQuery; delete window.document;
     return ok.join(',');
   })()
 ")
