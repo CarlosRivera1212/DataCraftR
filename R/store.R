@@ -40,8 +40,8 @@ dcr_id_path <- function(id) {
 #'
 #' Tools used from the RStudio Addins menu save their spec in the user data
 #' directory (`tools::R_user_dir("DataCraftR", "data")`) and insert
-#' `df <- dcr_load("<id>")` into your script. Literal tools (scatter, count)
-#' return exactly what was drawn. Population tools (boxplot, histogram,
+#' `df <- dcr_load("<id>")` into your script. Literal tools (scatter, count,
+#' mosaic) return exactly what was drawn. Population tools (boxplot, histogram,
 #' density, bivariate) re-sample using the stored seed, so the same data comes
 #' back, unless you give a different `seed`.
 #'

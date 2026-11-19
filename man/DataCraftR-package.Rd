@@ -8,7 +8,7 @@
 \description{
 \if{html}{\figure{logo.png}{options: style='float: right' alt='logo' width='120'}}
 
-Set of 'shiny'-based 'RStudio' add-ins for creating datasets by drawing. Users sketch scatter plots, histograms, density curves, boxplots, bivariate normal ellipses and count bar plots in an interactive gadget, and each drawing is returned as a data.frame together with a reproducible specification that can regenerate the same data. Methods are described in: Chang et al. (2024) \url{https://CRAN.R-project.org/package=shiny}; Bostock et al. (2011) \doi{10.1109/TVCG.2011.185}.
+Set of 'shiny'-based 'RStudio' add-ins for creating datasets by drawing. Users sketch scatter plots, histograms, density curves, boxplots, bivariate normal ellipses, count bar plots and two-way contingency tables (mosaic plots) in an interactive gadget, and each drawing is returned as a data.frame together with a reproducible specification that can regenerate the same data. Methods are described in: Chang et al. (2024) \url{https://CRAN.R-project.org/package=shiny}; Bostock et al. (2011) \doi{10.1109/TVCG.2011.185}.
 }
 \seealso{
 Useful links:

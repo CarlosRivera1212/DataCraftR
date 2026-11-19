@@ -1,3 +1,9 @@
+# DataCraftR 0.5.3
+
+* New tool `dcr_mosaic()`: draw an exact two-way contingency table as a mosaic
+  plot (drag column borders and cuts), with Independent / Uniform presets and
+  live chi-square, Cramer's V and odds ratio / relative risk.
+
 # DataCraftR 0.5.2
 
 * New tool `dcr_bivariate()`: shape bivariate normal populations as ellipses

@@ -1,8 +1,8 @@
 # DataCraftR <img src="man/figures/logo.png" align="right" height="138" alt="" />
 
 **DataCraftR** turns a drawing into a data set. Sketch a scatter plot, a
-histogram, a smooth density curve, a bivariate normal ellipse, a boxplot or a
-set of count bars in an interactive gadget, press **Done**, and get a
+histogram, a smooth density curve, a bivariate normal ellipse, a boxplot, a set
+of count bars or a contingency table in an interactive gadget, press **Done**, and get a
 `data.frame` back, together with a reproducible specification that regenerates
 the same data.
 
@@ -34,6 +34,7 @@ remotes::install_github("CarlosRivera1212/DataCraftR")
 | `dcr_density()` | A smooth density curve per variable (soft Pull / Paint brush) | A random sample from that distribution | `variables`, `n`, `xlim` |
 | `dcr_bivariate()` | One ellipse per group (Handles / Gestures) | A random sample from that bivariate normal: `x`, `y`, `group` | `groups`, `n`, `xlim`, `ylim`, `names` |
 | `dcr_count()` | Integer counts for every variable and category | Exactly those counts, one row per observation (`variable`, `category`) | `variables`, `categories`, `ymax` |
+| `dcr_mosaic()` | A mosaic of two categorical variables (drag column borders and cuts) | Exactly N rows, two factors (`exposure`, `outcome`), with live chi-square | `cols`, `rows`, `n`, `names` |
 
 ## Two ways to use them
 
@@ -83,11 +84,13 @@ dcr_delete("boxplot_20261117_153012")
 
 In DataCraftR:
 
-- proportions / contingency tables
 - radar
 - regression curve
-- missing data
 - reopen a saved drawing
+
+In a separate package for missing data (NA patterns, imputation):
+
+- missing data
 
 In a separate spatial / temporal package:
 
