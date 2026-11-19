@@ -1548,6 +1548,222 @@ run_check("Bivariate strokes", engine("bivariate"), paste0(bv_script, "
   })()
 "))
 
+run_check("Bivariate gestures", engine("bivariate"), paste0(bv_script, "
+  (function () {
+    var ok = [], t, d0, i, e, c, q, st;
+    var Z = function (e, x, y) { return B().zoneOf(e, {x: x, y: y}, 1); };
+    // zoneOf: axis-aligned ellipse (sd 1 and 0.5): 2-sigma contour at 2 and 1,
+    // ring 0.3 outside it, stretch up to 1.0 outside it
+    var E = {mx: 5, my: 5, s1: 1, s2: 0.5, th: 0};
+    ok.push(Z(E, 5, 5) === 'in' && Z(E, 6.9, 5) === 'in' && Z(E, 5, 5.9) === 'in');
+    ok.push(Z(E, 7.15, 5) === 'ring' && Z(E, 5, 6.15) === 'ring');
+    ok.push(Z(E, 7.6, 5) === 'stretch' && Z(E, 5, 6.6) === 'stretch');
+    ok.push(Z(E, 8.5, 5) === null && Z(E, 5, 7.5) === null);
+    // circle of sd 1: ring 2..2.3, stretch 2.3..3, in every direction
+    var C = {mx: 5, my: 5, s1: 1, s2: 1, th: 0.7};
+    ok.push([0, 1, 2, 3, 4, 5].every(function (k) {
+      var a = k * 1.1, f = function (r) { return Z(C, 5 + r * Math.cos(a), 5 + r * Math.sin(a)); };
+      return f(1.9) === 'in' && f(2.15) === 'ring' && f(2.6) === 'stretch' && f(3.1) === null;
+    }));
+    // rotated ellipse (th = 60 deg): zones follow the axes
+    var R = {mx: 5, my: 5, s1: 1, s2: 0.5, th: Math.PI / 3}, ca = Math.cos(R.th), sa = Math.sin(R.th);
+    ok.push(Z(R, 5 + 1.9 * ca, 5 + 1.9 * sa) === 'in' && Z(R, 5 + 2.15 * ca, 5 + 2.15 * sa) === 'ring' &&
+            Z(R, 5 + 2.6 * ca, 5 + 2.6 * sa) === 'stretch' &&
+            Z(R, 5 - 2.6 * sa, 5 + 2.6 * ca) === null &&
+            Z(R, 5 - 1.6 * sa, 5 + 1.6 * ca) === 'stretch');
+    // the zone scales with the unit u
+    ok.push(B().zoneOf(E, {x: 8.5, y: 5}, 2) === 'stretch' && B().zoneOf(E, {x: 7.3, y: 5}, 2) === 'ring');
+
+    function gt(o, ell) {
+      var t = mk(['A'], o); t.ui.mode = 'gestures';
+      if (ell) t.state.ell[0] = copyOf(ell);
+      t._dom.svg.style = {};
+      return t;
+    }
+    function down(t, x, y, o) {
+      var q = px(t, x, y), ev = {button: 0, pointerId: 1, clientX: q[0], clientY: q[1]};
+      for (var k in (o || {})) ev[k] = o[k];
+      t._pointerDown(ev);
+    }
+    function move(t, x, y) { var q = px(t, x, y); t._pointerMove({pointerId: 1, clientX: q[0], clientY: q[1]}); }
+    function up(t) { t._pointerUp({pointerId: 1}); t.endStroke(); }
+    function drag(t, from, tos, o) {
+      down(t, from[0], from[1], o);
+      tos.forEach(function (p) { move(t, p[0], p[1]); });
+      up(t);
+    }
+
+    // stretch grabbed near the major axis changes only s1: outward grows,
+    // inward shrinks, relative to the grab (no jump)
+    t = gt({}, E); d0 = t.history._index;
+    drag(t, [7.6, 5], [[8.9, 5.0]]);
+    e = t.state.ell[0];
+    ok.push(near(e.s1, 1.5, 1e-6) && e.s2 === 0.5 && e.th === 0 && e.mx === 5 && e.my === 5 &&
+            t.history._index === d0 + 1);
+    t = gt({}, E);
+    drag(t, [7.6, 5], [[6.3, 5]]);
+    ok.push(near(t.state.ell[0].s1, 0.5, 1e-6) && t.state.ell[0].s2 === 0.5);
+    // grab on the far (left) side: outward is still growth
+    t = gt({}, E);
+    drag(t, [2.4, 5], [[1.1, 5]]);
+    ok.push(near(t.state.ell[0].s1, 1.5, 1e-6) && t.state.ell[0].s2 === 0.5);
+    // off-axis grab: the pointer's projection on the axis is what counts
+    t = gt({}, E);
+    drag(t, [7.6, 5.4], [[8.9, 6.0]]);
+    ok.push(near(t.state.ell[0].s1, 1.5, 1e-6) && t.state.ell[0].th === 0);
+    // through the centre and out the other side: SMIN (0.05), never <= 0, never mirrors
+    t = gt({}, E);
+    drag(t, [7.6, 5], [[5, 5], [3, 5], [1, 5]]);
+    e = t.state.ell[0];
+    ok.push(near(e.s1, 0.05, 1e-9) && e.s2 === 0.5 && e.th === 0 && finite(t));
+    // grabbed near the minor axis: only s2 changes
+    t = gt({}, E);
+    drag(t, [5, 6.6], [[5, 7.4]]);
+    e = t.state.ell[0];
+    ok.push(near(e.s2, 0.5 * 2.4 / 1.6, 1e-6) && e.s1 === 1 && e.th === 0);
+    t = gt({}, E);
+    drag(t, [5, 3.4], [[5, 4.2]]);
+    e = t.state.ell[0];
+    ok.push(near(e.s2, 0.5 * 0.8 / 1.6, 1e-6) && e.s1 === 1);
+    t = gt({}, E);
+    drag(t, [5, 6.6], [[5, 5], [5, 2], [5, 0.5]]);
+    e = t.state.ell[0];
+    ok.push(near(e.s2, 0.05, 1e-9) && e.s1 === 1 && finite(t));
+    // rotated ellipse: stretch follows the ellipse axes
+    t = gt({}, R);
+    drag(t, [5 + 2.6 * ca, 5 + 2.6 * sa], [[5 + 3.9 * ca, 5 + 3.9 * sa]]);
+    e = t.state.ell[0];
+    ok.push(near(e.s1, 1.5, 1e-6) && e.s2 === 0.5 && e.th === R.th);
+    // the rho limit holds: s2 cannot go below RATIO * s1
+    t = gt({}, {mx: 5, my: 5, s1: 4, s2: 2, th: 0});
+    drag(t, [5, 5 + 2 * 2 + 0.5], [[5, 5.5], [5, 5]]);
+    e = t.state.ell[0];
+    ok.push(e.s2 >= 4 * 0.02237 - 1e-12 && e.s2 > 0.05 - 1e-12 && Math.abs(B().toMarginal(e).rho) <= 0.999 + 1e-9);
+
+    // first move right after the dead zone: nothing beyond the pointer delta
+    t = gt({}, E);
+    down(t, 7.6, 5); move(t, 7.6 + 0.2, 5);          // 2 px: still a click
+    ok.push(t.state.ell[0].s1 === 1);
+    move(t, 7.6 + 0.3, 5);                           // 3 px: first real move
+    ok.push(near(t.state.ell[0].s1, 2.9 / 2.6, 1e-9)); up(t);
+    t = gt({}, E);
+    down(t, 5, 6.6); move(t, 5, 6.6 + 0.3);
+    ok.push(near(t.state.ell[0].s2, 0.5 * 1.9 / 1.6, 1e-9) && t.state.ell[0].s1 === 1); up(t);
+
+    // ring drag: rotates by the pointer's angular delta, no sd change
+    var th0 = Math.PI / 6, Rg = {mx: 5, my: 5, s1: 1, s2: 0.5, th: th0};
+    t = gt({}, Rg);
+    // find a ring point for this ellipse in direction 0.2 rad
+    var rr = null;
+    for (var r = 0.5; r < 6; r += 0.01) {
+      if (Z(Rg, 5 + r * Math.cos(0.2), 5 + r * Math.sin(0.2)) === 'ring') { rr = r + 0.05; break; }
+    }
+    function at(a, rad) { return [5 + rad * Math.cos(a), 5 + rad * Math.sin(a)]; }
+    drag(t, at(0.2, rr), [at(0.2 + Math.PI / 4, rr)]);
+    e = t.state.ell[0];
+    ok.push(near(e.th, th0 + Math.PI / 4, 1e-6) && e.s1 === 1 && e.s2 === 0.5 && e.mx === 5);
+    // multi-turn accumulation (+405 deg in 45 deg steps), no flip
+    t = gt({}, Rg);
+    var steps = []; for (i = 1; i <= 9; i++) steps.push(at(0.2 + i * Math.PI / 4, rr));
+    drag(t, at(0.2, rr), steps);
+    ok.push(near(t.state.ell[0].th, th0 + 9 * Math.PI / 4, 1e-6));
+    // and the other way (-270 deg)
+    t = gt({}, Rg);
+    steps = []; for (i = 1; i <= 6; i++) steps.push(at(0.2 - i * Math.PI / 4, rr));
+    drag(t, at(0.2, rr), steps);
+    ok.push(near(t.state.ell[0].th, th0 - 6 * Math.PI / 4, 1e-6) && t.state.ell[0].s1 === 1);
+    // the angle freezes while the pointer is near the centre
+    t = gt({}, Rg);
+    drag(t, at(0.2, rr), [at(0.2 + 4, 0.05), at(0.2 + Math.PI / 2, rr)]);
+    ok.push(near(t.state.ell[0].th, th0 + Math.PI / 2, 1e-6));
+    // a near-circular ellipse rotates and stays finite
+    t = gt({}, {mx: 5, my: 5, s1: 1, s2: 0.999, th: 0});
+    drag(t, at(0.1, 2.15), [at(1.7, 2.15), at(3.3, 2.15), at(4.9, 2.15), at(6.5, 2.15)]);
+    ok.push(finite(t) && t.state.ell[0].s1 === 1 && t.state.ell[0].s2 === 0.999);
+    // Shift + stretch rotates (decided at pointerdown); no Shift: stretches
+    t = gt({}, E);
+    drag(t, [7.6, 5], [[5, 7.6]], {shiftKey: true});
+    e = t.state.ell[0];
+    ok.push(near(e.th, Math.PI / 2, 1e-6) && e.s1 === 1 && e.s2 === 0.5);
+    t = gt({}, E);
+    down(t, 7.6, 5, {shiftKey: true}); up(t);
+    down(t, 7.6, 5); move(t, 8.9, 5); up(t);
+    ok.push(near(t.state.ell[0].s1, 1.5, 1e-6) && t.state.ell[0].th === 0);
+
+    // inside = move (as Handles centre): relative to the grab, clamped to the view
+    t = gt({}, E);
+    drag(t, [5.5, 5.2], [[6.5, 6.2]]);
+    e = t.state.ell[0];
+    ok.push(near(e.mx, 6, 1e-6) && near(e.my, 6, 1e-6) && e.s1 === 1 && e.s2 === 0.5);
+    t = gt({}, E);
+    drag(t, [5, 5], [[20, 5]]);
+    ok.push(t.state.ell[0].mx === 10 || t.state.xlim[1] >= 10);
+
+    // 200 presses without movement in each zone, on empty canvas and in another group: no history, no freeze
+    t = mk(['A', 'B']); t.ui.mode = 'gestures'; t._dom.svg.style = {};
+    t.state.ell[0] = {mx: 3, my: 3, s1: 1, s2: 0.5, th: 0};
+    t.state.ell[1] = {mx: 8, my: 8, s1: 0.5, s2: 0.5, th: 0};
+    d0 = t.history._index;
+    var pts = [[3, 3], [5.15, 3], [5.6, 3], [3, 4.15], [3, 4.6], [9.5, 1], [8, 8]];
+    for (i = 0; i < 200; i++) {
+      q = pts[i % pts.length];
+      down(t, q[0], q[1], i % 5 === 0 ? {shiftKey: true} : {});
+      if (i % 3 === 0) { var m = px(t, q[0], q[1]); t._pointerMove({pointerId: 1, clientX: m[0] + 1, clientY: m[1] - 1}); }
+      up(t);
+      t.ui.active = 0;
+    }
+    ok.push(t.history._index === d0 && !t._busy && !t._stroke && finite(t));
+    // 2.9 px in each zone commits nothing
+    [[3, 3], [5.15, 3], [5.6, 3]].forEach(function (p) {
+      var a = px(t, p[0], p[1]);
+      stroke(t, [[a[0], a[1]], [a[0] + 2.9, a[1]]]);
+    });
+    ok.push(t.history._index === d0);
+    // a real drag in each zone is exactly one entry; undo restores
+    var before = copyOf(mk(['A', 'B']).state.ell[0]);   // the history's initial state
+    var moved0 = copyOf(t.state.ell[0]);
+    drag(t, [5.6, 3], [[6.0, 3], [6.5, 3]]);
+    drag(t, [3, 3], [[3.5, 3.2]]);
+    ok.push(t.history._index === d0 + 2);
+    t.undo(); t.undo();
+    ok.push(same(t.state.ell[0], before) && !same(before, moved0));
+    // in Gestures mode the handles are not hit; in Handles mode the ring/stretch zones are not
+    t = mk(['A']); t.ui.mode = 'gestures'; t._dom.svg.style = {}; t.state.ell[0] = copyOf(E);
+    d0 = t.history._index;
+    var hq = handle(t, 'major');
+    t._pointerDown({button: 0, pointerId: 1, clientX: hq[0], clientY: hq[1]});
+    ok.push(t._stroke && t._stroke.kind === 'move');           // major handle is inside the 2 sigma contour
+    t._pointerUp({pointerId: 1}); t.endStroke();
+    t = mk(['A']); t.state.ell[0] = copyOf(E); t._dom.svg.style = {};
+    down(t, 7.15, 5);
+    ok.push(!t._stroke);
+    // switching Handles <-> Gestures mid-session keeps working
+    t.setControl('mode', 'gestures'); down(t, 7.15, 5);
+    ok.push(t._stroke && t._stroke.kind === 'rotate'); up(t);
+    t.setControl('mode', 'handles'); down(t, 7.15, 5);
+    ok.push(!t._stroke);
+    h = handle(t, 'major'); t._pointerDown({button: 0, pointerId: 1, clientX: h[0], clientY: h[1]});
+    ok.push(t._stroke && t._stroke.kind === 'major'); up(t);
+    // clicking another group's interior selects it, even inside the active group's ring
+    t = mk(['A', 'B']); t.ui.mode = 'gestures'; t._dom.svg.style = {};
+    t.state.ell[0] = {mx: 5, my: 5, s1: 1, s2: 1, th: 0};
+    t.state.ell[1] = {mx: 7.5, my: 5, s1: 0.5, s2: 0.5, th: 0};
+    d0 = t.history._index;
+    down(t, 7.2, 5); up(t);
+    ok.push(t.ui.active === 1 && t.history._index === d0 && !t._stroke);
+    // cursors per zone
+    t = gt({}, E); t._dom.plot = {}; t._requestDraw = function () {};
+    function cur(x, y, o) {
+      var q = px(t, x, y), ev = {clientX: q[0], clientY: q[1]};
+      for (var k in (o || {})) ev[k] = o[k];
+      t._hover(ev); return t._dom.svg.style.cursor;
+    }
+    ok.push(cur(5, 5) === 'move' && cur(7.15, 5) === 'grab' && cur(7.6, 5) === 'crosshair' &&
+            cur(7.6, 5, {shiftKey: true}) === 'grab' && cur(9.5, 1) === 'default');
+    return ok.join(',');
+  })()
+"))
+
 run_check("Bivariate axes", engine("bivariate"), paste0(bv_script, "
   (function () {
     var ok = [], t, d0, s, c;

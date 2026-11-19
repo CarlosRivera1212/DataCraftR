@@ -243,6 +243,20 @@ Start: `df <- dcr_scatter()` (groups A, B, C; x and y ranges 0 to 10).
       handle slightly off its centre does not make it jump. With "Fit axes
       automatically" off a handle cannot be pulled out of the plot, and a
       very thin ellipse's centre can still be grabbed.
+- [ ] Gestures mode (switch "Editing" to Gestures; the handles disappear):
+      drag inside the active ellipse to move it (stops at the plot edge);
+      grab just outside the 2-sigma contour (the thin ring, highlighted on
+      hover, cursor "grab") and circle the pointer: the ellipse rotates by
+      exactly the angle you sweep, past 180 degrees and several turns, no jump
+      at the grab, sds unchanged. Grab further out (up to about one handle
+      unit, cursor crosshair) near the major axis and drag out and in: only the
+      major sd changes, with no jump at the first move; near the minor axis:
+      only the minor sd. Pull through the centre and out the other side: the
+      sd sticks at the tiny minimum, never mirrors. Hold Shift when grabbing
+      in the outer zone: it rotates instead. Click inside another group: it
+      becomes active even over the active group's rings. Switch Handles <->
+      Gestures mid-session: both keep working on the same ellipses; each drag
+      is one undo step and clicks without movement add none.
 - [ ] Click inside another group's 2-sigma ellipse: it becomes the active group
       (sidebar buttons follow) and nothing is added to the undo history.
       Keys `1`-`2` do the same.
@@ -269,8 +283,7 @@ Start: `df <- dcr_scatter()` (groups A, B, C; x and y ranges 0 to 10).
 - [ ] `dcr_bivariate(c("A", "B", "C"), n = 4e5)` errors before opening;
       `n = 0` errors; in the sidebar a sample size (or group list) that would
       exceed 1e6 rows is refused: the message "n x groups must be at most 1e6"
-      shows and the sidebar goes back to the previous value. Modes: "Gestures" is accepted and behaves like "Handles"
-      for now.
+      shows and the sidebar goes back to the previous value.
 - [ ] Edit then Done: drag something, then type in a field (e.g. sample size
       `37`) and click Done directly, without Enter or a click elsewhere.
       `nrow(df) == 37 * 2` and the new value is applied.

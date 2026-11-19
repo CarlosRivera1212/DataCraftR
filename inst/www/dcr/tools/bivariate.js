@@ -8,8 +8,11 @@
  * Settings (this.ui, not undoable): {active, mode, autofit}; lim0 keeps the
  * initial limits for "Reset axes". Handles mode: centre moves, the major
  * handle sets s1 and rotates (relative to the grab), the minor handle sets
- * s2. The gestures mode value is accepted and behaves like handles until the
- * gesture layer exists. One drag = one stroke = one history entry. */
+ * s2. Gestures mode (no handles): inside the 2-sigma contour moves, the band
+ * just outside it (ring) rotates by the pointer's angular delta, the band
+ * beyond (stretch) scales the sd of the axis nearest the grab, or rotates with
+ * Shift held. All gestures are relative to the stroke-start snapshot. One drag
+ * = one stroke = one history entry. */
 (function (root) {
   "use strict";
 
@@ -199,6 +202,21 @@
   // Autofit off: a dragged sd is capped so its handle stays inside the view.
   function capSd(v, x, y, dx, dy, s, smin) {
     return Math.max(smin, Math.min(v, reach(x, y, dx, dy, s.xlim, s.ylim)));
+  }
+
+  // Zone of p relative to the 2-sigma contour of e, u = the handle unit in data
+  // units: "in" (inside), "ring" (within 0.3 u outside), "stretch" (within
+  // 1.0 u outside) or null. The distance outside is first order.
+  function zoneOf(e, p, u) {
+    var dx = p.x - e.mx, dy = p.y - e.my, c = Math.cos(e.th), s = Math.sin(e.th);
+    var a = (dx * c + dy * s) / e.s1, b = (-dx * s + dy * c) / e.s2;
+    var q = Math.sqrt(a * a + b * b);
+    if (q <= 2) return "in";
+    var grad = Math.sqrt(a * a / (e.s1 * e.s1) + b * b / (e.s2 * e.s2)) / q;
+    var d = (q - 2) / grad;
+    if (d <= 0.3 * u) return "ring";
+    if (d <= 1.0 * u) return "stretch";
+    return null;
   }
 
   var Bivariate = DCR.extend(DCR.Tool, {
@@ -423,7 +441,8 @@
 
     // What is under p: {kind: "major" | "minor" | "move"} for the active
     // group's handles, {kind: "select", i} for another group, or null.
-    _hit: function (p) {
+    _hit: function (p, shift) {
+      if (this.ui.mode === "gestures") return this._gestureHit(p, shift);
       var s = this.state, i = this.activeIndex(), e = s.ell[i], HIT = 0.28 * this._unit();
       var h = this._handles(e);
       function d(q) { return Math.hypot(p.x - q.x, p.y - q.y); }
@@ -441,6 +460,21 @@
       return null;
     },
 
+    // Gestures mode: {kind: "move" | "rotate" | "stretch", i, zone} on the
+    // active group's zones, {kind: "select", i} inside another group (wins over
+    // the active group's ring and stretch bands), or null.
+    _gestureHit: function (p, shift) {
+      var s = this.state, i = this.activeIndex(), e = s.ell[i];
+      var zone = zoneOf(e, p, this._unit());
+      if (zone === "in") return { kind: "move", i: i, zone: zone };
+      for (var j = 0; j < s.ell.length; j++) {
+        if (j !== i && this._inside2(s.ell[j], p)) return { kind: "select", i: j };
+      }
+      if (zone === "ring") return { kind: "rotate", i: i, zone: zone };
+      if (zone === "stretch") return { kind: shift ? "rotate" : "stretch", i: i, zone: zone };
+      return null;
+    },
+
     // ---- Pointer strokes: one drag = one history entry -------------------------
     _pointerDown: function (ev) {
       if (ev.button !== 0 || !this._geo) return;
@@ -451,7 +485,7 @@
         if (ev.pointerId !== old.id && held) return;
         this._pointerUp({ pointerId: old.id });
       }
-      var p = this._toData(ev), hit = this._hit(p);
+      var p = this._toData(ev), hit = this._hit(p, ev.shiftKey);
       if (!hit) return;
       if (hit.kind === "select") {
         this.ui.active = hit.i;
@@ -472,8 +506,34 @@
       var qn = { x: -Math.sin(e.th), y: Math.cos(e.th) };
       this._stroke.q0 = (p.x - e.mx) * qn.x + (p.y - e.my) * qn.y;
       this._stroke.sgn = this._stroke.q0 >= 0 ? 1 : -1;
+      if (hit.kind === "stretch") this._stretchAxis(this._stroke, e, p);
+      this._hoverZone = hit.kind === "rotate" ? "ring" : null;
       this.beginStroke();
       this._requestDraw();
+    },
+
+    // Stretch grab: pick the axis (major or minor) nearest the grab direction
+    // once; pro0 is the projection of the grab on it (never ~0: the grab is
+    // outside the 2-sigma contour), sg the side it was grabbed on.
+    _stretchAxis: function (st, e, p) {
+      var c = Math.cos(e.th), s = Math.sin(e.th), dx = p.x - e.mx, dy = p.y - e.my;
+      var along = dx * c + dy * s, across = -dx * s + dy * c;
+      var major = Math.abs(along) >= Math.abs(across), v = major ? along : across;
+      st.axis = major ? "s1" : "s2";
+      st.dir = major ? { x: c, y: s } : { x: -s, y: c };
+      st.sg = v >= 0 ? 1 : -1;
+      st.pro0 = Math.max(Math.abs(v), 1e-3 * this._unit());
+    },
+
+    // Rotation by the accumulated, wrapped angular delta of the pointer around
+    // the centre since the grab; frozen while the pointer is too close to the
+    // centre to define an angle.
+    _rotate: function (st, e, p) {
+      if (Math.hypot(p.x - e.mx, p.y - e.my) < 0.14 * this._unit()) return;
+      var a = Math.atan2(p.y - e.my, p.x - e.mx), da = a - st.ang;
+      st.acc += Math.atan2(Math.sin(da), Math.cos(da));
+      st.ang = a;
+      e.th = st.start.th + st.acc;
     },
 
     _pointerMove: function (ev) {
@@ -499,16 +559,21 @@
         // grabbing off the handle centre never jumps; the angle is frozen
         // while the pointer is too close to the centre to define one
         var r = Math.hypot(p.x - e.mx, p.y - e.my);
-        if (r >= 0.14 * this._unit()) {
-          var a = Math.atan2(p.y - e.my, p.x - e.mx), da = a - st.ang;
-          st.acc += Math.atan2(Math.sin(da), Math.cos(da));
-          st.ang = a;
-          e.th = st.start.th + st.acc;
-        }
+        this._rotate(st, e, p);
         e.s1 = clampSd(st.start.s1 + (r - st.r0), e.s2, smin, smax);
         // autofit off: keep the dragged handle in view (reachability wins over
         // the rho ratio near the view edge)
         if (!this.ui.autofit) e.s1 = capSd(e.s1, e.mx, e.my, Math.cos(e.th), Math.sin(e.th), s, smin);
+      } else if (st.kind === "rotate") {
+        this._rotate(st, e, p);
+      } else if (st.kind === "stretch") {
+        // signed projection on the axis chosen at the grab, relative to it:
+        // pulling through the centre stops at the minimum, never mirrors
+        var pr = st.sg * ((p.x - e.mx) * st.dir.x + (p.y - e.my) * st.dir.y);
+        var sd = st.start[st.axis] * Math.max(pr, 0) / st.pro0;
+        sd = clampSd(sd, st.axis === "s1" ? e.s2 : e.s1, smin, smax);
+        if (!this.ui.autofit) sd = capSd(sd, e.mx, e.my, st.sg * st.dir.x, st.sg * st.dir.y, s, smin);
+        e[st.axis] = sd;
       } else {
         // signed projection on the (fixed) minor axis, relative to the grab:
         // pulling through the centre stops at the minimum, never mirrors
@@ -544,8 +609,15 @@
     },
 
     _hover: function (ev) {
-      var hit = this._hit(this._toData(ev));
-      this._dom.svg.style.cursor = !hit ? "default" : hit.kind === "move" ? "move" : "pointer";
+      var hit = this._hit(this._toData(ev), ev.shiftKey), zone = null;
+      var cur = !hit ? "default" : hit.kind === "move" ? "move" :
+        hit.kind === "rotate" ? "grab" : hit.kind === "stretch" ? "crosshair" : "pointer";
+      if (hit && (hit.zone === "ring" || hit.zone === "stretch")) zone = hit.zone;
+      this._dom.svg.style.cursor = cur;
+      if (zone !== this._hoverZone) {
+        this._hoverZone = zone;
+        this._requestDraw();
+      }
     },
 
     // ---- Rendering -------------------------------------------------------------
@@ -566,6 +638,10 @@
         message: document.createElement("div")
       };
       dom.groups = dom.plot.append("g");
+      // gestures aids: dashed edge of the stretch zone, highlight of the hovered band
+      dom.guide = dom.plot.append("path").attr("fill", "none").attr("stroke-width", 1)
+        .attr("stroke-opacity", 0.35).attr("stroke-dasharray", "4 4");
+      dom.band = dom.plot.append("path").attr("fill", "none").attr("stroke-width", 9);
       dom.axMajor = dom.plot.append("line").attr("stroke-dasharray", "3 3").attr("stroke-opacity", 0.6);
       dom.axMinor = dom.plot.append("line").attr("stroke-dasharray", "3 3").attr("stroke-opacity", 0.6);
       dom.dot = dom.plot.append("circle").attr("r", 4);
@@ -580,6 +656,12 @@
         dom.svg.addEventListener(t, function (ev) {
           self[t === "pointerdown" ? "_pointerDown" : "_pointerMove"](ev);
         });
+      });
+      dom.svg.addEventListener("pointerleave", function () {
+        if (!self._stroke && self._hoverZone) {
+          self._hoverZone = null;
+          self._requestDraw();
+        }
       });
       ["pointerup", "pointercancel", "lostpointercapture"].forEach(function (t) {
         dom.svg.addEventListener(t, function (ev) { self._pointerUp(ev); });
@@ -661,6 +743,19 @@
       return d + "Z";
     },
 
+    // Closed path at distance d (data units) outside the 2-sigma contour of e.
+    _offset: function (e, d) {
+      var c = Math.cos(e.th), s = Math.sin(e.th), out = "";
+      for (var i = 0; i <= N_ELLIPSE; i++) {
+        var t = 2 * Math.PI * i / N_ELLIPSE, ct = Math.cos(t), st = Math.sin(t);
+        var nu = ct / e.s1, nv = st / e.s2, nl = Math.hypot(nu, nv) || 1;
+        var u = 2 * e.s1 * ct + d * nu / nl, v = 2 * e.s2 * st + d * nv / nl;
+        var q = this._px(e.mx + u * c - v * s, e.my + u * s + v * c);
+        out += (i ? "L" : "M") + q[0].toFixed(1) + "," + q[1].toFixed(1);
+      }
+      return out + "Z";
+    },
+
     // Two paths per group, built once (rebuilt when the group count or the
     // active group changes) and updated in place.
     _draw: function () {
@@ -692,7 +787,14 @@
       });
       var e = s.ell[act], col = DCR.palette[act % 10], h = this._handles(e);
       var c = this._px(e.mx, e.my), hm = this._px(h.major.x, h.major.y), hn = this._px(h.minor.x, h.minor.y);
-      var handles = this.ui.mode === "handles" || this.ui.mode === "gestures";
+      var handles = this.ui.mode === "handles", gest = this.ui.mode === "gestures";
+      var zone = this._stroke && this._stroke.kind === "rotate" ? "ring" : this._stroke ? null : this._hoverZone;
+      var u = this._unit();
+      dom.guide.style("display", gest ? null : "none").attr("stroke", col);
+      if (gest) dom.guide.attr("d", this._offset(e, 1.0 * u));
+      dom.band.style("display", gest && zone ? null : "none").attr("stroke", col)
+        .attr("stroke-opacity", zone === "ring" ? 0.3 : 0.12);
+      if (gest && zone) dom.band.attr("d", this._offset(e, 0.15 * u));
       dom.dot.attr("cx", c[0]).attr("cy", c[1]).attr("fill", col);
       dom.axMajor.attr("x1", c[0]).attr("y1", c[1]).attr("x2", hm[0]).attr("y2", hm[1])
         .attr("stroke", col).style("display", handles ? null : "none");
@@ -723,5 +825,6 @@
   Bivariate.fitLimits = fitLimits;
   Bivariate.contains = contains;
   Bivariate.clampSd = clampSd;
+  Bivariate.zoneOf = zoneOf;
   DCR.register("bivariate", Bivariate);
 })(typeof window !== "undefined" ? window : this);
