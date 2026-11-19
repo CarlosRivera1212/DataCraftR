@@ -411,8 +411,8 @@ Run `dcr_regression()` (also with `groups = c("A", "B", "C")` for the group step
       last icon at the new level (one undo step per slider move, however long
       the drag). After a hand error stroke, undo/redo or Clear the slider
       instead scales the band proportionally. Pausing the slider for more
-      than 0.4 s in the middle of one drag makes two undo steps. The slider always
-      shows the largest sd of the selected group (also after undo, Clear or
+      than 0.4 s in the middle of one drag makes two undo steps. The slider
+      always shows the largest sd of the selected group (also after undo, Clear or
       switching group). Fit to y refits the axis.
 - [ ] Equation: `sin(x)`, `exp(x/3)`, `x^2/10` buttons fill the field and apply
       at once (one undo step); typing `2 + 0.5 * x` and Enter / Apply works;

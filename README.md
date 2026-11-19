@@ -30,14 +30,14 @@ remotes::install_github("CarlosRivera1212/DataCraftR")
 | Function | What you draw | What you get | Main arguments |
 |---|---|---|---|
 | `dcr_scatter()` | Points for up to 10 groups (spray, place, erase) | Exactly the drawn points: `x`, `y`, `group` | `xlim`, `ylim`, `groups`, `names` |
+| `dcr_count()` | Integer counts for every variable and category | Exactly those counts, one row per observation (`variable`, `category`) | `variables`, `categories`, `ymax` |
+| `dcr_mosaic()` | A mosaic of two categorical variables (drag column borders and cuts) | Exactly N rows, two factors (`exposure`, `outcome`); live chi-square in the gadget | `cols`, `rows`, `n`, `names` |
 | `dcr_boxplot()` | Q1, median and Q3 of one box per variable | A random sample matching those quartiles | `variables`, `n`, `family` (`"normal"`/`"uniform"`), `ylim` |
 | `dcr_histogram()` | Bar heights for one histogram per variable | A random sample from that population | `variables`, `n`, `xlim`, `nbins` |
 | `dcr_density()` | A smooth density curve per variable (soft Pull / Paint brush) | A random sample from that distribution | `variables`, `n`, `xlim` |
 | `dcr_bivariate()` | One ellipse per group (Handles / Gestures) | A random sample from that bivariate normal: `x`, `y`, `group` | `groups`, `n`, `xlim`, `ylim`, `names` |
-| `dcr_count()` | Integer counts for every variable and category | Exactly those counts, one row per observation (`variable`, `category`) | `variables`, `categories`, `ymax` |
 | `dcr_regression()` | One true curve and error band per group (Pull / Paint brush, equation, error-shape presets) | n random `x`, `y`, `group` rows per group around the curve | `f`, `groups`, `n`, `xlim`, `sd`, `names`, `shared_x` |
-| `dcr_radar()` | One mean profile and spread band per group on a radar chart | n individuals per group, one column per variable, plus a `group` column | `variables`, `groups`, `n`, `range`, `integers` |
-| `dcr_mosaic()` | A mosaic of two categorical variables (drag column borders and cuts) | Exactly N rows, two factors (`exposure`, `outcome`); live chi-square in the gadget | `cols`, `rows`, `n`, `names` |
+| `dcr_radar()` | One mean profile and spread band per group on a radar chart | n individuals per group, one column per variable, plus a `group` column | `variables`, `groups`, `n`, `range`, `integers`, `group_name` |
 
 ## Two ways to use them
 

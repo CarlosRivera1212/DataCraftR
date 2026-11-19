@@ -96,7 +96,7 @@ regression_options <- function(f, groups, n, xlim, sd, names, shared_x) {
   sm <- matrix(sd, nrow = k, ncol = regression_k)
   list(groups = groups, n = n, xlim = xlim, f = fm, s = sm, level = max(sm[1, ]),
        level_max = max(1, 2 * max(sd), diff(range(fm)) / 2),
-       names = regression_names(names), shared_x = shared_x)
+       names = scatter_names(names), shared_x = shared_x)
 }
 
 #' Draw a regression curve with its error band and get a random sample
@@ -173,7 +173,7 @@ regression_validate <- function(key, value, ctl = list(), ...) {
     },
     xlim = check_range(as.numeric(unlist(value)), key),
     n = histogram_check_n(unlist(value)),
-    names = regression_names(unlist(value)),
+    names = scatter_names(unlist(value)),
     equation = {
       txt <- as.character(unlist(value))
       if (length(txt) == 0L || is.na(txt[1]) || !nzchar(trimws(txt[1]))) {

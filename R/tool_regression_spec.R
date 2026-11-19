@@ -1,16 +1,3 @@
-# x, y, group names as a named list in that order, validated.
-regression_names <- function(names) {
-  keys <- c("x", "y", "group")
-  if (!is.null(names(names)) && setequal(names(names), keys)) {
-    names <- names[keys]
-  }
-  if (length(names) != 3L) {
-    stop("names must have x, y and group.", call. = FALSE)
-  }
-  nms <- check_names(as.character(unlist(names, use.names = FALSE)), "names")
-  stats::setNames(as.list(nms), keys)
-}
-
 # groups x K numeric matrix from a matrix, a list of per-group vectors or a
 # plain vector (one group).
 regression_matrix <- function(v, what, k) {
@@ -39,7 +26,7 @@ regression_matrix <- function(v, what, k) {
 #' @noRd
 spec_from_json.dcr_json_regression <- function(x) {
   nm <- x[["names"]] %||% list(x = "x", y = "y", group = "group")
-  nms <- regression_names(nm)
+  nms <- scatter_names(nm)
   groups <- check_names(unlist(x[["groups"]]), "groups")
   k <- length(groups)
   xlim <- check_range(unlist(x[["xlim"]]), "xlim")

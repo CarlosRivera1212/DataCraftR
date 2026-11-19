@@ -7,8 +7,8 @@
 dcr_list()
 }
 \value{
-A data frame with columns \code{id}, \code{tool}, \code{created} and \code{n}, newest
-first. Files in the store that are not readable specs are ignored.
+A data frame with columns \code{id}, \code{tool}, \code{created} and \code{n} (the total
+number of rows), newest first. Files in the store that are not readable specs are ignored.
 }
 \description{
 List saved DataCraftR datasets

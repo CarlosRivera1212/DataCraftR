@@ -371,7 +371,7 @@
             .attr("stroke", col).attr("stroke-width", on ? 2 : 1);
           if (showLabels) {
             dom.labels.append("text").attr("text-anchor", "middle")
-              .attr("font-size", 11)
+              .style("font-size", "11px")
               .attr("x", bx + G.bw / 2).attr("y", y(n) - 3).text(n);
           }
         });
@@ -383,7 +383,7 @@
         var g = dom.legend.append("g").attr("transform", "translate(" + lx + ",14)");
         g.append("rect").attr("width", 10).attr("height", 10).attr("y", -9)
           .attr("fill", DCR.palette[i % 10]).attr("fill-opacity", 0.8);
-        g.append("text").attr("x", 14).attr("font-size", 12)
+        g.append("text").attr("x", 14).style("font-size", "12px").style("fill", "#1f2933")
           .attr("font-weight", i === act && nv > 1 ? 600 : 400).text(v);
         lx += 14 + v.length * 7 + 14;
       });

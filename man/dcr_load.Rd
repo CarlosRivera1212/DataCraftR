@@ -9,7 +9,9 @@ dcr_load(id, n = NULL, seed = NULL)
 \arguments{
 \item{id}{Id of a saved spec, as shown by \code{\link[=dcr_list]{dcr_list()}}.}
 
-\item{n}{Number of rows for population tools; defaults to the stored \code{n}.}
+\item{n}{Number of rows for population tools (per group for bivariate,
+regression and radar); defaults to the stored \code{n}. The cap of 1e6 rows in
+total is checked when the drawing is made, not when \code{n} is overridden here.}
 
 \item{seed}{Integer seed for population tools; defaults to the stored seed.}
 }

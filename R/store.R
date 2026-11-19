@@ -46,7 +46,9 @@ dcr_id_path <- function(id) {
 #' the same data comes back, unless you give a different `seed`.
 #'
 #' @param id Id of a saved spec, as shown by [dcr_list()].
-#' @param n Number of rows for population tools; defaults to the stored `n`.
+#' @param n Number of rows for population tools (per group for bivariate,
+#'   regression and radar); defaults to the stored `n`. The cap of 1e6 rows in
+#'   total is checked when the drawing is made, not when `n` is overridden here.
 #' @param seed Integer seed for population tools; defaults to the stored seed.
 #' @return A data frame (see [dcr_sample()]).
 #' @examples
@@ -62,8 +64,8 @@ dcr_load <- function(id, n = NULL, seed = NULL) {
 
 #' List saved DataCraftR datasets
 #'
-#' @return A data frame with columns `id`, `tool`, `created` and `n`, newest
-#'   first. Files in the store that are not readable specs are ignored.
+#' @return A data frame with columns `id`, `tool`, `created` and `n` (the total
+#'   number of rows), newest first. Files in the store that are not readable specs are ignored.
 #' @examples
 #' if (FALSE) {
 #'   dcr_list()

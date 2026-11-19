@@ -445,7 +445,7 @@
       var act = map[this.activeIndex()];
       this.ui.active = act >= 0 ? act : 0;
       this._commitWith({ groups: groups, mean: mean, sd: sd });
-      if (gone.length) this._flash(gone.join(", ") + " removed - Ctrl+Z to undo");
+      if (gone.length) this._flash(gone.join(", ") + " removed " + String.fromCharCode(8212) + " Ctrl+Z to undo");
     },
 
     // New variable list: columns keep their values by name (renames pair in
@@ -471,7 +471,7 @@
       });
       this._cache = {};
       this._commitWith({ variables: vars, ranges: ranges, mean: mean, sd: sd });
-      if (gone.length) this._flash(gone.join(", ") + " removed - Ctrl+Z to undo");
+      if (gone.length) this._flash(gone.join(", ") + " removed " + String.fromCharCode(8212) + " Ctrl+Z to undo");
     },
 
     // Clear: every group back to the initial profile for the current groups,

@@ -3577,6 +3577,13 @@ for (kk in c(1L, 2L, 3L, 7L, 10L)) {
 }
 
 
+# Count labels carry inline styles (the .dcr-tool svg text CSS rule would
+# otherwise override font-size / fill attributes).
+ct_src <- read_src("inst/www/dcr/tools/count.js")
+stopifnot(grepl('.style("font-size", "11px")', ct_src, fixed = TRUE),
+          grepl('.style("font-size", "12px").style("fill", "#1f2933")', ct_src, fixed = TRUE),
+          !grepl('.attr("font-size"', ct_src, fixed = TRUE))
+
 cat("JS OK (", length(files), " files checked, History, EchoGuard (+expiry), Tool queue, ",
     "Scatter (+offset range, R round trip), Boxplot (+ordering, R round trip), ",
     "Histogram (+R round trip), Count (+R round trip), Density (+R round trip, Done flush), Bivariate (+R round trip, Done flush), Mosaic (+R round trip, Done flush), Regression (+R round trip, Done flush), Radar (+R round trip, Done flush), ",

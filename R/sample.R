@@ -6,7 +6,9 @@
 #' left as it was.
 #'
 #' @param spec A `dcr_spec` object, e.g. from [dcr_spec()].
-#' @param n Number of rows for population tools; defaults to `spec$n`.
+#' @param n Number of rows for population tools (per group for bivariate,
+#'   regression and radar); defaults to `spec$n`. The cap of 1e6 rows in
+#'   total is checked when the drawing is made, not when `n` is overridden here.
 #' @param seed Optional integer seed; defaults to `spec$seed`.
 #' @return A data frame with attribute `"dcr_spec"` holding the spec used (with
 #'   `n` and `seed` set to the values used).

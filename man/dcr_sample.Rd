@@ -9,7 +9,9 @@ dcr_sample(spec, n = NULL, seed = NULL)
 \arguments{
 \item{spec}{A \code{dcr_spec} object, e.g. from \code{\link[=dcr_spec]{dcr_spec()}}.}
 
-\item{n}{Number of rows for population tools; defaults to \code{spec$n}.}
+\item{n}{Number of rows for population tools (per group for bivariate,
+regression and radar); defaults to \code{spec$n}. The cap of 1e6 rows in
+total is checked when the drawing is made, not when \code{n} is overridden here.}
 
 \item{seed}{Optional integer seed; defaults to \code{spec$seed}.}
 }
