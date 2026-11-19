@@ -1,3 +1,9 @@
+# DataCraftR 0.5.5
+
+* New tool `dcr_radar()`: draw group mean profiles and their spread on a radar
+  chart; n individuals per group from truncated normals within each variable's
+  range (optional integer scales).
+
 # DataCraftR 0.5.4
 
 * New tool `dcr_regression()`: draw a regression curve and its error band
