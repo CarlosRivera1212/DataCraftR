@@ -410,7 +410,10 @@ Run `dcr_regression()` (also with `groups = c("A", "B", "C")` for the group step
       replaces the band (one undo step each); the level slider re-applies the
       last icon at the new level (one undo step per slider move, however long
       the drag). After a hand error stroke, undo/redo or Clear the slider
-      instead scales the band proportionally. Fit to y refits the axis.
+      instead scales the band proportionally. Pausing the slider for more
+      than 0.4 s in the middle of one drag makes two undo steps. The slider always
+      shows the largest sd of the selected group (also after undo, Clear or
+      switching group). Fit to y refits the axis.
 - [ ] Equation: `sin(x)`, `exp(x/3)`, `x^2/10` buttons fill the field and apply
       at once (one undo step); typing `2 + 0.5 * x` and Enter / Apply works;
       with `log(x)` on 0..10 a warning says the equation is undefined for some
@@ -422,7 +425,7 @@ Run `dcr_regression()` (also with `groups = c("A", "B", "C")` for the group step
       ends held beyond the old range, one undo step; invalid values (blank,
       min >= max) give a notification and no change.
 - [ ] Show sample (off by default): tick it: n dots (at most 300 per group) sit
-      around the curve in the group colours with the label "Preview - Done
+      around the curve in the group colours with the label "Preview — Done
       draws a new sample", and a Residuals vs fitted plot appears at the top
       right; both follow the sculpting live; Resample redraws them. Untick: gone.
 - [ ] Groups: names "A, B, C" give three colours; keys 1-3 (or the buttons)

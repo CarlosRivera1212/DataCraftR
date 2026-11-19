@@ -2376,7 +2376,7 @@ rg_script <- "
       if (t._stroke) t._stroke.last -= 100;
       t._pointerMove({pointerId: 1, clientX: p[0], clientY: p[1]});
     });
-    t._pointerUp({pointerId: 1}); t.endStroke();
+    t._pointerUp({pointerId: 1});
   }
   function near(a, b, e) { return Math.abs(a - b) < (e || 1e-9); }
   function allFinite(t) {
@@ -2582,12 +2582,12 @@ run_check("Regression strokes", engine("regression"), paste0(rg_script, "
     t._pointerDown({button: 0, pointerId: 7, clientX: 50, clientY: 50});
     t._pointerDown({button: 0, pointerId: 8, clientX: 50, clientY: 50});
     ok.push(t._stroke.id === 8);
-    t._pointerUp({pointerId: 8}); t.endStroke();
+    t._pointerUp({pointerId: 8});
     t._dom.svg.hasPointerCapture = function () { return true; };
     t._pointerDown({button: 0, pointerId: 1, clientX: 50, clientY: 50});
     t._pointerDown({button: 0, pointerId: 2, clientX: 50, clientY: 50});
     ok.push(t._stroke.id === 1);
-    t._pointerUp({pointerId: 1}); t.endStroke();
+    t._pointerUp({pointerId: 1});
     t._dom.svg.hasPointerCapture = undefined;
     // a throwing commit never leaves the engine busy
     t = mk('A', [0, 10]);
@@ -2604,7 +2604,7 @@ run_check("Regression strokes", engine("regression"), paste0(rg_script, "
     t._stroke.last -= 5000;                   // a long wait before moving must not paint a full step
     t._pointerMove({pointerId: 1, clientX: 50, clientY: 40});
     var after = t.state.f[0][100];
-    t._pointerUp({pointerId: 1}); t.endStroke();
+    t._pointerUp({pointerId: 1});
     ok.push(Math.abs(after - 5) < 1);
     // brush clamp and sigma as a fraction of diff(xlim)
     ok.push(mk('A', [0, 10], {brush: 0}).ui.brush === 0.005 && mk('A', [0, 10], {brush: 7}).ui.brush === 1);
@@ -2691,8 +2691,9 @@ run_check("Regression controls", engine("regression"), paste0(rg_script, "
     ok.push(t.history._index === depth && t.state.s[0].join() === sh.join());
     t.redo();
     ok.push(near(t.state.s[0][100], sh[100] * 0.5) && t.ui.lastPreset === null);
-    // a second burst scales from the first (L_prev follows the slider)
-    t.setControl('level', 1); t._flushLevel();
+    // after redo the slider shows max(s) of the active group; the next move scales from it
+    ok.push(t.ui.level === Math.max.apply(null, t.state.s[0]));
+    t.setControl('level', 2); t._flushLevel();
     ok.push(near(t.state.s[0][100], sh[100]));
     // a hand error stroke, undo/redo and Clear clear lastPreset
     t = mk('A', [0, 10]); t.action('preset-cone'); t.ui.target = 'error';
@@ -2715,6 +2716,47 @@ run_check("Regression controls", engine("regression"), paste0(rg_script, "
     // Clear keeps the current xlim: the initial curves are resampled onto it
     t = mk('A', [0, 10]); t.setControl('xlim', [0, 20]); t.action('preset-cone'); t.clear();
     ok.push(t.state.xlim[1] === 20 && near(t.state.f[0][100], 10) && t.state.f[0][200] === 10);
+
+    // (a) a hand-sculpted s on group B is not replaced by A's remembered preset
+    t = mk(['A', 'B'], [0, 10]); t.action('preset-cone');
+    t.run('select-2'); t.ui.target = 'error';
+    a = px(t, 5, 7); b = px(t, 5, 9); stroke(t, [a, [a[0], a[1] - 5], b]);   // B: s(5) = 2
+    t.run('select-1'); t.run('select-2');
+    var shB = t.state.s[1].slice(), mB = Math.max.apply(null, shB);
+    ok.push(t.ui.lastPreset === null && t.ui.level === mB && t.ui.levelPrev === mB);
+    t.setControl('level', mB * 2); t._flushLevel();
+    ok.push(t.state.s[1].every(function (v, k) { return near(v, shB[k] * 2, 1e-9); }) &&
+            t.state.s[0].join() === R.preset('cone', xsOf(t), 1).join());
+    // switching group shows that group's max(s) on the slider
+    t.run('select-1');
+    ok.push(t.ui.level === Math.max.apply(null, t.state.s[0]));
+    // (b) level 1 -> 0 -> undo -> move keeps the sculpted shape (scaled), not Constant
+    t = mk('A', [0, 10]); t.ui.target = 'error';
+    a = px(t, 5, 7); b = px(t, 5, 9); stroke(t, [a, [a[0], a[1] - 5], b]);
+    var sc = t.state.s[0].slice(), mx = Math.max.apply(null, sc);
+    t.setControl('level', 0); t.undo();
+    ok.push(t.ui.level === mx && t.ui.levelPrev === mx && t.state.s[0].join() === sc.join());
+    t.setControl('level', mx * 3); t._flushLevel();
+    ok.push(t.state.s[0].every(function (v, k) { return near(v, sc[k] * 3, 1e-9); }));
+    // the slider display is clamped to level_max, levelPrev is not
+    t = mk('A', [0, 10], {level_max: 1.5}); t.ui.target = 'error';
+    a = px(t, 5, 7); b = px(t, 5, 9); stroke(t, [a, [a[0], a[1] - 5], b]);
+    t.undo(); t.redo();
+    ok.push(t.ui.level === 1.5 && t.ui.levelPrev === Math.max.apply(null, t.state.s[0]));
+    // (c) Clear with nothing to clear still resyncs the slider
+    t = mk('A', [0, 10]); t.ui.level = 3; t.ui.levelPrev = 3; t.ui.lastPreset = 'cone';
+    t.clear();
+    ok.push(t.ui.level === 1 && t.ui.levelPrev === 1 && t.ui.lastPreset === null);
+    // initial curves are keyed by group name: remove A, Clear keeps B's own initial curve
+    var xl = ident();
+    t = mk(['A', 'B'], [0, 10], {f: [xl, xl.map(function (v) { return 100 + v; })]});
+    t.setControl('groups', 'B');
+    t.clear();
+    ok.push(t.state.f[0][0] === 100 && t.state.f[0][200] === 110);
+    t.setControl('groups', 'B, C');                     // C: not in the options -> position 1 -> row 1
+    ok.push(t.state.f[1][0] === 100);
+    t.setControl('groups', 'B, C, D, E');               // beyond the last row: the last row
+    ok.push(t.state.f[3][0] === 100);
     // y covers every group
     t = mk(['A', 'B'], [0, 10]);
     t.action('select-2'); t.setControl('equation', {f: xsOf(t).map(function (x) { return 100 + x; })});

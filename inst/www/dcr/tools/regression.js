@@ -244,7 +244,8 @@
         show: show,
         ylim: [-1, 1]
       };
-      this.level0 = level;
+      var lm = cleanNumber(o.level_max);
+      this.levelMax = lm !== null && lm > 0 ? lm : 5;
       this._bindDom();
     },
 
@@ -261,7 +262,7 @@
       s0 = s0.map(function (r) { return r.map(function (v) { return Math.max(0, v); }); });
       // the initial curves (options) live on the options' xlim; new groups and
       // Clear take them resampled onto the current xlim
-      this._init = { xlim: xlim.slice(), f: f0, s: s0 };
+      this._init = { xlim: xlim.slice(), names: groups.slice(), f: f0, s: s0 };
       var state = {
         groups: groups,
         names: cleanVarNames(o.names) || { x: "x", y: "y", group: "group" },
@@ -275,9 +276,12 @@
       return state;
     },
 
-    // Initial curve of group j on the grid of xlim.
-    _initCurves: function (j, xlim) {
-      var I = this._init, r = Math.min(j, I.f.length - 1);
+    // Initial curves of the group called `name` (else the one at position j,
+    // else the last row) on the grid of xlim.
+    _initCurves: function (name, j, xlim) {
+      var I = this._init, r = I.names.indexOf(name);
+      if (r < 0) r = j;
+      r = Math.min(r, I.f.length - 1);
       return { f: resample(I.f[r], I.xlim, xlim), s: resample(I.s[r], I.xlim, xlim) };
     },
 
@@ -378,6 +382,7 @@
           if (v !== ui.active) {
             ui.active = v;
             this.render();
+            this._resyncLevel();
           }
           break;
         case "target":
@@ -434,7 +439,6 @@
     // Every commit, undo and redo refits the y axis to all groups.
     _show: function (state) {
       this.ui.ylim = fitY(state.f, state.s);
-      this.ui.levelPrev = this.ui.level;
       DCR.Tool.prototype._show.call(this, state);
     },
 
@@ -442,14 +446,25 @@
       if (this._busy) { DCR.Tool.prototype.undo.call(this); return; }
       this._flushLevel();
       DCR.Tool.prototype.undo.call(this);
-      this.ui.lastPreset = null;
+      this._resyncLevel();
     },
 
     redo: function () {
       if (this._busy) { DCR.Tool.prototype.redo.call(this); return; }
       this._flushLevel();
       DCR.Tool.prototype.redo.call(this);
-      this.ui.lastPreset = null;
+      this._resyncLevel();
+    },
+
+    // The level slider and the remembered preset describe the active group's s:
+    // after anything that changes which s that is (undo, redo, Clear, another
+    // group) the slider shows max(s) and a hand-sculpted s is scaled from it.
+    _resyncLevel: function () {
+      var ui = this.ui, m = Math.max.apply(null, this.state.s[this.activeIndex()]);
+      ui.lastPreset = null;
+      ui.levelPrev = m;
+      ui.level = Math.min(m, this.levelMax);
+      this.syncControls();
     },
 
     // New xlim: every curve is resampled onto the new grid, end values held
@@ -478,6 +493,7 @@
       var next = DCR.deepCopy(this.state), i = this.activeIndex();
       next.s[i] = preset(kind, grid(next.xlim, next.s[i].length), this.ui.level);
       this.ui.lastPreset = kind;
+      this.ui.levelPrev = this.ui.level;
       if (!same(next, this.state)) this.commit(next);
     },
 
@@ -512,18 +528,15 @@
       if (!lv) return;
       this._lv = null;
       if (lv.timer && typeof root.clearTimeout === "function") root.clearTimeout(lv.timer);
-      if (same(this.state, this.history.state)) {
-        this.ui.levelPrev = this.ui.level;
-        return;
-      }
-      this.commit(this.state);
+      if (!same(this.state, this.history.state)) this.commit(this.state);
+      this.ui.levelPrev = this.ui.level;
     },
 
     // New group list: curves keep their values by name (renames pair in
     // order); new groups start from the initial f and s.
     _setGroups: function (groups) {
       var s = this.state, map = remapGroups(s.groups, groups), self = this;
-      var init = groups.map(function (g, j) { return self._initCurves(j, s.xlim); });
+      var init = groups.map(function (g, j) { return self._initCurves(g, j, s.xlim); });
       var f = init.map(function (c) { return c.f; }), sd = init.map(function (c) { return c.s; });
       var gone = [];
       map.forEach(function (j, i) {
@@ -538,6 +551,7 @@
       this.ui.active = act >= 0 ? act : 0;
       this._smp = null;
       this._commitWith({ groups: groups, f: f, s: sd });
+      this._resyncLevel();
       if (gone.length) this._flash(gone.join(", ") + " removed \u2014 Ctrl+Z to undo");
     },
 
@@ -546,14 +560,12 @@
     clear: function () {
       this._flushLevel();
       var s = this.state, self = this;
-      var init = s.groups.map(function (g, j) { return self._initCurves(j, s.xlim); });
+      var init = s.groups.map(function (g, j) { return self._initCurves(g, j, s.xlim); });
       var next = DCR.deepCopy(s);
       next.f = init.map(function (c) { return c.f; });
       next.s = init.map(function (c) { return c.s; });
-      this.ui.lastPreset = null;
-      this.ui.level = this.level0;
       if (!same(next, s)) this.commit(next);
-      else this.syncControls();
+      this._resyncLevel();
     },
 
     action: function (name) {
@@ -564,7 +576,7 @@
         if (k < this.state.groups.length && k !== ui.active) {
           ui.active = k;
           this.render();
-          this.syncControls();
+          this._resyncLevel();
         }
       } else if (/^preset-/.test(name)) {
         var kind = name.slice(7);
