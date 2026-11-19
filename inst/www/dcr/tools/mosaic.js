@@ -16,7 +16,7 @@
 
   var DCR = root.DCR;
   var MARGIN = { left: 16, right: 150, top: 16, bottom: 56 };
-  var STATS_H = 48;        // px reserved at the bottom for the stats panel
+  var STATS_H = 48;        // px assumed for the stats panel until it is measured
   var HIT = 4;             // half width of a grab area (8 px in all)
   var DEAD_ZONE = 3;       // px: a press that moves less than this is a click
   var N_MAX = 1e6;
@@ -504,8 +504,8 @@
       el.appendChild(svg);
       var stats = document.createElement("div");
       stats.className = "dcr-mosaic-stats";
-      stats.style.cssText = "position:absolute;left:0;right:0;bottom:0;height:" + STATS_H +
-        "px;box-sizing:border-box;padding:4px 14px;overflow-y:auto;background:#fff;" +
+      stats.style.cssText = "position:absolute;left:0;right:0;bottom:0;" +
+        "box-sizing:border-box;padding:4px 14px;background:#fff;" +
         "border-top:1px solid #dfe3e8;font-size:12px;display:flex;flex-wrap:wrap;" +
         "gap:2px 18px;align-content:flex-start;pointer-events:none;";
       el.appendChild(stats);
@@ -525,13 +525,20 @@
     },
 
     render: function () {
-      var W = this.el.clientWidth, H = this.el.clientHeight;
-      if (!W || !H) return;
+      if (!this.el.clientWidth || !this.el.clientHeight) return;
       if (!this._dom) this._build();
-      var w = Math.max(40, W - MARGIN.left - MARGIN.right);
-      var h = Math.max(40, H - MARGIN.top - MARGIN.bottom - STATS_H);
-      this._geo = { x0: MARGIN.left, y0: MARGIN.top, w: w, h: h };
+      this._layout();
       this._draw();
+    },
+
+    // Plot area from the element size and the measured height of the stats
+    // panel (which grows with its content).
+    _layout: function () {
+      var W = this.el.clientWidth, H = this.el.clientHeight;
+      var ph = this._statsH || STATS_H;
+      this._geo = { x0: MARGIN.left, y0: MARGIN.top,
+                    w: Math.max(40, W - MARGIN.left - MARGIN.right),
+                    h: Math.max(40, H - MARGIN.top - MARGIN.bottom - ph) };
     },
 
     // Redraw at most once per frame.
@@ -548,6 +555,13 @@
     _draw: function () {
       var dom = this._dom, geo = this._geo;
       if (!dom || !geo || !dom.stats) return;
+      this._drawStats();
+      var ph = dom.stats.offsetHeight;
+      if (ph > 0 && Math.abs(ph - (this._statsH || STATS_H)) >= 1) {
+        this._statsH = ph;                 // the panel changed height: re-fit the plot
+        this._layout();
+        geo = this._geo;
+      }
       var s = this.state, counts = s.counts, N = grand(counts);
       var nr = s.rows.length, nc = s.cols.length, bx = this._borders(counts, geo);
       var svg = dom.svg, c, r, y1 = geo.y0 + geo.h;
@@ -600,7 +614,6 @@
       svg.appendChild(svgEl("rect", { x: geo.x0, y: geo.y0, width: geo.w, height: geo.h,
         fill: "none", stroke: "#c9ced6", "pointer-events": "none" }));
       svg.style.cursor = act ? (act.kind === "v" ? "ew-resize" : "ns-resize") : "default";
-      this._drawStats();
     },
 
     _drawHandle: function (svg, act, bx) {
@@ -665,9 +678,27 @@
 
   function svgEl(name, attrs, text) {
     var e = document.createElementNS("http://www.w3.org/2000/svg", name);
+    if (name === "text") attrs = textAttrs(attrs);
     for (var k in attrs) e.setAttribute(k, attrs[k]);
     if (text !== undefined) e.textContent = text;
     return e;
+  }
+
+  // The page stylesheet sets fill and font-size on every svg text, so these
+  // go in the inline style (which wins) rather than in attributes.
+  function textAttrs(attrs) {
+    var out = {}, style = "";
+    for (var k in attrs) {
+      if (k === "fill" || k === "font-size" || k === "font-weight") {
+        style += k + ":" + attrs[k] + (k === "font-size" ? "px" : "") + ";";
+      } else if (k === "style") {
+        style += attrs[k];
+      } else {
+        out[k] = attrs[k];
+      }
+    }
+    out.style = style;
+    return out;
   }
 
   function labelAttrs(x, y, size, weight) {
@@ -689,6 +720,8 @@
   Mosaic.dragColumn = dragColumn;
   Mosaic.dragCut = dragCut;
   Mosaic.chisq = chisq;
+  Mosaic.textAttrs = textAttrs;
+  Mosaic.labelAttrs = labelAttrs;
 
   DCR.register("mosaic", Mosaic);
 })(typeof window !== "undefined" ? window : this);

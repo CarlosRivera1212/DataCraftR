@@ -1,10 +1,22 @@
+# 2 to 10 unique, non-empty category names.
+mosaic_check_cats <- function(x, what) {
+  if (is.character(x) && (length(x) < 2L || length(x) > 10L)) {
+    stop(what, " must have 2 to 10 names.", call. = FALSE)
+  }
+  x <- check_names(x, what)
+  if (length(x) < 2L) stop(what, " must have 2 to 10 names.", call. = FALSE)
+  x
+}
+
 # col, row names as a named list in that order, validated.
 mosaic_names <- function(names) {
   keys <- c("col", "row")
-  if (!is.null(names(names)) && setequal(names(names), keys)) {
+  nm <- names(names)
+  if (!is.null(nm) && any(nzchar(nm))) {
+    if (!setequal(nm, keys)) stop("names must have col and row.", call. = FALSE)
     names <- names[keys]
   }
-  if (length(names) != 2L) {
+  if (length(names) != 2L || (is.list(names) && any(lengths(names) != 1L))) {
     stop("names must have col and row.", call. = FALSE)
   }
   nms <- check_names(as.character(unlist(names, use.names = FALSE)), "names")
@@ -14,15 +26,18 @@ mosaic_names <- function(names) {
 #' @export
 #' @noRd
 spec_from_json.dcr_json_mosaic <- function(x) {
-  cols <- check_names(x[["cols"]], "cols")
-  rows <- check_names(x[["rows"]], "rows")
-  if (length(cols) < 2L) stop("cols must have 2 to 10 names.", call. = FALSE)
-  if (length(rows) < 2L) stop("rows must have 2 to 10 names.", call. = FALSE)
+  cols <- mosaic_check_cats(x[["cols"]], "cols")
+  rows <- mosaic_check_cats(x[["rows"]], "rows")
   names <- mosaic_names(x[["names"]] %||% list(col = "exposure", row = "outcome"))
   nr <- length(rows)
   nc <- length(cols)
   counts <- x[["counts"]]
-  if (is.list(counts)) counts <- do.call(rbind, lapply(counts, as.numeric))
+  if (is.list(counts)) {
+    if (any(lengths(counts) != nc)) {
+      stop("counts dimensions must be rows x cols.", call. = FALSE)
+    }
+    counts <- do.call(rbind, lapply(counts, as.numeric))
+  }
   if (!is.numeric(counts) && !is.logical(counts)) {
     stop("counts must be numeric.", call. = FALSE)
   }

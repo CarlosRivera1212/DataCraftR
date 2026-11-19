@@ -46,7 +46,7 @@ test_that("mosaic control values are validated before reaching JS", {
   expect_error(v("cols", "A"), "2 to 10")
   expect_error(v("cols", "A, A"), "unique")
   expect_error(v("rows", "A, , B"), "empty")
-  expect_error(v("rows", paste(letters[1:11], collapse = ",")), "1 to 10")
+  expect_error(v("rows", paste(letters[1:11], collapse = ",")), "2 to 10")
   expect_equal(v("n", 200), 200)
   expect_error(v("n", 0), "n must")
   expect_error(v("n", 2.5), "n must")

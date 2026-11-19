@@ -2079,16 +2079,21 @@ run_check("Mosaic maths", engine("mosaic"), paste0(mo_script, "
     ok.push(eq(M.dragCut(c3, 0, 1, 0), c3));
     // chisq against R chisq.test(correct = FALSE)
     var q = M.chisq([[30, 20], [10, 40]]);
-    ok.push(near(q.stat, 16.6666666666667, 1e-6) && q.df === 1 && near(q.p, 4.45570906040561e-05, 1e-6) &&
+    ok.push(near(q.stat, 16.6666666666667, 1e-6) && q.df === 1 && near(q.p / 4.45570906040561e-05, 1, 1e-6) &&
             near(q.v, 0.408248290463863, 1e-6) && near(q.or, 6, 1e-9) && near(q.rr, 8 / 3, 1e-9) &&
             q.expectedLow === 0);
     q = M.chisq([[12, 7, 4], [5, 15, 8], [9, 3, 20]]);
-    ok.push(near(q.stat, 22.7575848064978, 1e-6) && q.df === 4 && near(q.p, 0.000141557058070167, 1e-6) &&
+    ok.push(near(q.stat, 22.7575848064978, 1e-6) && q.df === 4 && near(q.p / 0.000141557058070167, 1, 1e-6) &&
             near(q.v, 0.370261913213462, 1e-6) && q.or === null && q.rr === null);
     q = M.chisq([[5, 5], [0, 5]]);
     ok.push(q.or === null && q.rr === null && M.chisq([[1, 2], [3, 4]]).expectedLow === 4);
     q = M.chisq([[0, 0], [5, 5]]);
     ok.push(q.df === 0 && q.p === null && q.v === null && q.stat === 0);
+    // block labels carry their fill/size inline (the page stylesheet overrides attributes)
+    var la = M.textAttrs(M.labelAttrs(1, 2, 13, 600)), ta = M.textAttrs({x: 1, fill: '#1f2933', 'font-size': 12, 'font-weight': 600});
+    ok.push(/fill:#fff;/.test(la.style) && /font-size:13px;/.test(la.style) && /font-weight:600;/.test(la.style) &&
+            la.fill === undefined && la['font-size'] === undefined && la.x === 1 &&
+            /fill:#1f2933;font-size:12px;/.test(ta.style) && ta.fill === undefined && ta.x === 1);
     q = M.chisq([[1, 3], [2, 4]]);
     ok.push(near(q.stat, 0.0793650793650794, 1e-9));
     return ok.join(',');
@@ -2136,22 +2141,26 @@ run_check("Mosaic strokes", engine("mosaic"), paste0(mo_script, "
     ok.push(cT(t.state.counts, 0) === 0 && cT(t.state.counts, 1) === 200);
     stroke(t, [[1, 20], [31, 20]]);                              // grab the zero-width border, pull out
     ok.push(cT(t.state.counts, 0) === 30 && eq(t.state.counts.map(function (r) { return r[0]; }), [15, 15]));
-    // coincident borders (right edge): left picks the first, right the last
-    t = mk({cols: ['a', 'b', 'c'], n: 200}); setCounts(t, [[100, 0, 0], [100, 0, 0]]);
-    stroke(t, [[199, 20], [169, 20]]);
-    ok.push(eq(t.state.counts.map(function (r) { return r.join(); }), ['85,15,0', '85,15,0']));
-    setCounts(t, [[100, 0, 0], [100, 0, 0]]);
-    stroke(t, [[199, 20], [199 + 30, 20]]);
-    ok.push(eq(t.state.counts, [[100, 0, 0], [100, 0, 0]]));    // right: nothing to take from col c
-    // coincident cuts: up picks the first cut, down the last
-    t = mk({rows: ['a', 'b', 'c'], n: 150});
-    setCounts(t, [[50, 50], [0, 50], [0, 50]]);                 // col 0: two cuts at its bottom
-    depth = t.history._index;
-    stroke(t, [[30, 99], [30, 79]]);
-    ok.push(t.state.counts.map(function (r) { return r[0]; }).join() === '40,10,0' && t.history._index === depth + 1);
-    setCounts(t, [[50, 50], [0, 50], [0, 50]]); depth = t.history._index;
-    stroke(t, [[30, 99], [30, 150]]);
-    ok.push(t.history._index === depth && t.state.counts[2][0] === 0);
+    // coincident borders (two empty columns between non-empty ones): left takes
+    // the first border, right the last; the two choices change different columns
+    t = mk({cols: ['a', 'b', 'c', 'd'], n: 200}); setCounts(t, [[60, 0, 0, 40], [60, 0, 0, 40]]);
+    var startB = JSON.parse(JSON.stringify(t.state.counts));
+    stroke(t, [[120, 20], [100, 20]]);
+    ok.push(eq(t.state.counts.map(function (r) { return r.join(); }), ['50,10,0,40', '50,10,0,40']));
+    setCounts(t, startB);
+    stroke(t, [[120, 20], [140, 20]]);
+    ok.push(eq(t.state.counts.map(function (r) { return r.join(); }), ['60,0,10,30', '60,0,10,30']));
+    // coincident cuts (two empty blocks between non-empty ones): up takes the first
+    // cut, down the last
+    t = mk({rows: ['a', 'b', 'c', 'd'], n: 160});
+    setCounts(t, [[30, 25], [0, 25], [0, 25], [30, 25]]);       // col 0: three cuts at y = 50
+    var startC = JSON.parse(JSON.stringify(t.state.counts)); depth = t.history._index;
+    stroke(t, [[30, 50], [30, 30]]);
+    ok.push(t.state.counts.map(function (r) { return r[0]; }).join() === '18,12,0,30' &&
+            cT(t.state.counts, 1) === 100 && t.history._index === depth + 1);
+    setCounts(t, startC);
+    stroke(t, [[30, 50], [30, 70]]);
+    ok.push(t.state.counts.map(function (r) { return r[0]; }).join() === '30,0,12,18');
     // a zero-width column has no cuts: only its border is hit
     t = mk({n: 200}); setCounts(t, [[0, 100], [0, 100]]);
     var hz = t._hitTest(0, 50), hc = t._hitTest(40, 50);
@@ -2276,7 +2285,8 @@ run_check("Mosaic controls", engine("mosaic"), paste0(mo_script, "
     t = mk({cols: ['a', 'b'], rows: ['x', 'y'], n: 10}); msgs(t);
     setCounts(t, [[4, 0], [6, 0]]);
     t.setControl('cols', 'p, q, r');                                    // a, b -> not a rename
-    ok.push(sum(flat(t.state.counts)) === 10 && t.state.counts[0].length === 3);
+    ok.push(sum(flat(t.state.counts)) === 10 && t.state.counts[0].length === 3 &&
+            flashed.length === 1 && /^10 observations of a removed/.test(flashed[0]));
     return ok.join(',');
   })()
 "))
@@ -2333,7 +2343,7 @@ run_check("Mosaic Done flush", engine("mosaic"), paste0(flush_script, "
   })()
 "))
 
-cat("JS OK (", length(files), " files checked,History, EchoGuard (+expiry), Tool queue, ",
+cat("JS OK (", length(files), " files checked, History, EchoGuard (+expiry), Tool queue, ",
     "Scatter (+offset range, R round trip), Boxplot (+ordering, R round trip), ",
     "Histogram (+R round trip), Count (+R round trip), Density (+R round trip, Done flush), Bivariate (+R round trip, Done flush), Mosaic (+R round trip, Done flush), ",
     "Done flush, Removal notices OK)\n",

@@ -54,9 +54,7 @@ mosaic_check_n <- function(n) {
 # Split a comma-separated text (or a vector) into 2 to 10 validated names.
 mosaic_split_names <- function(value, what) {
   txt <- paste(as.character(unlist(value)), collapse = ",")
-  out <- check_names(strsplit(txt, ",", fixed = TRUE)[[1]], what)
-  if (length(out) < 2L) stop(what, " must have 2 to 10 names.", call. = FALSE)
-  out
+  mosaic_check_cats(strsplit(txt, ",", fixed = TRUE)[[1]], what)
 }
 
 #' @noRd
