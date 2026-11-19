@@ -76,6 +76,23 @@ run_check("History budget", engine(), "
   })()
 ")
 
+# Statistics toggle: flips aria-expanded and asks the current tool to
+# re-lay-out (render) each time.
+run_check("DCR.toggleStats", engine(), "
+  (function () {
+    var attrs = {'aria-expanded': 'false', 'aria-controls': 'x'}, ok = [];
+    var btn = {getAttribute: function (k) { return attrs[k]; },
+               setAttribute: function (k, v) { attrs[k] = v; }};
+    var renders = 0;
+    DCR.current = {render: function () { renders++; }};
+    ok.push(DCR.toggleStats(btn) === true && attrs['aria-expanded'] === 'true');
+    ok.push(renders === 1);
+    ok.push(DCR.toggleStats(btn) === false && attrs['aria-expanded'] === 'false');
+    ok.push(renders === 2);
+    return ok.join(',');
+  })()
+")
+
 # EchoGuard: echoes (in order) are dropped once; other values are real.
 run_check("EchoGuard", engine(), "
   (function () {

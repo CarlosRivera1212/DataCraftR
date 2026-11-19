@@ -97,7 +97,30 @@ body { background: var(--dcr-panel); color: var(--dcr-ink); overflow: hidden; }
   padding: 4px 10px; border-radius: 99px; pointer-events: none;
 }
 
-.dcr-stats { padding: 0 14px 10px; max-height: 30vh; overflow-y: auto; }
+/* Statistics: collapsible bar (collapsed by default) + scrolling table */
+.dcr-sbar {
+  display: flex; align-items: center; gap: 8px; width: calc(100% - 28px);
+  margin: 0 14px 10px; padding: 7px 10px; background: #fff; text-align: left;
+  border: 1px solid var(--dcr-line); border-radius: var(--dcr-radius);
+  font: inherit; font-size: 12.5px; color: var(--dcr-ink); cursor: pointer;
+}
+.dcr-sbar:hover { border-color: var(--dcr-blue); }
+.dcr-sbar:focus-visible { outline: 2px solid var(--dcr-blue); outline-offset: -2px; }
+.dcr-sbar .dcr-sum { color: var(--dcr-muted); }
+.dcr-sbar .dcr-chev, .dcr-sbar > svg {
+  margin-left: auto; width: 16px; height: 16px; flex: none; transition: transform .15s;
+}
+.dcr-sbar .dcr-chev {
+  width: 7px; height: 7px; margin-right: 4px; border-right: 1.6px solid currentColor;
+  border-bottom: 1.6px solid currentColor; transform: rotate(45deg);
+}
+.dcr-sbar[aria-expanded="true"] .dcr-chev { transform: rotate(-135deg); }
+.dcr-sbar[aria-expanded="true"] > svg { transform: rotate(180deg); }
+.dcr-stats {
+  margin: -4px 14px 10px; max-height: 30vh; overflow: auto; background: #fff;
+  border: 1px solid var(--dcr-line); border-radius: var(--dcr-radius);
+}
+.dcr-stats[hidden] { display: none; }
 .dcr-stats table { width: 100%; margin: 0; border-collapse: collapse; font-size: 12px; background: transparent; }
 .dcr-stats th {
   font-weight: 600; color: var(--dcr-muted); text-align: right;

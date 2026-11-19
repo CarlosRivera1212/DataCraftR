@@ -262,8 +262,27 @@
                              { priority: "event" });
   };
 
+  // ---- Statistics panel: collapsible bar -----------------------------------
+  // The bar button (aria-expanded, aria-controls) shows or hides the panel;
+  // the canvas gains or loses height, so the current tool re-lays-out (its
+  // ResizeObserver does the same, this covers engines without one).
+  DCR.toggleStats = function (btn) {
+    var open = btn.getAttribute("aria-expanded") !== "true";
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+    var id = btn.getAttribute("aria-controls");
+    var body = id && root.document ? root.document.getElementById(id) : null;
+    if (body) body.hidden = !open;
+    if (DCR.current) DCR.current.render();
+    return open;
+  };
+
   // ---- Delegated listeners (browser only) ----------------------------------
   if (typeof document === "undefined") return;
+
+  document.addEventListener("click", function (ev) {
+    var bar = ev.target.closest ? ev.target.closest("[data-dcr-toggle='stats']") : null;
+    if (bar) { ev.preventDefault(); DCR.toggleStats(bar); }
+  });
 
   document.addEventListener("click", function (ev) {
     var btn = ev.target.closest ? ev.target.closest("[data-dcr-action]") : null;

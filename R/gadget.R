@@ -97,6 +97,26 @@ dcr_notify <- function(msg, type = c("message", "warning", "error")) {
   shiny::showNotification(msg, type = match.arg(type))
 }
 
+#' Collapsible statistics panel (collapsed by default; toggled in core.js)
+#' @noRd
+dcr_stats_panel <- function() {
+  tags <- htmltools::tags
+  tags$div(
+    class = "dcr-statsbox",
+    tags$button(
+      type = "button", id = "dcr-stats-toggle", class = "dcr-sbar",
+      `data-dcr-toggle` = "stats", `aria-expanded` = "false",
+      `aria-controls` = "dcr-stats-body",
+      tags$b("Statistics"),
+      tags$span(class = "dcr-sum", "\u00b7 ",
+                shiny::textOutput("n_sum", inline = TRUE)),
+      tags$span(class = "dcr-chev", `aria-hidden` = "true")
+    ),
+    tags$div(id = "dcr-stats-body", class = "dcr-stats", hidden = NA,
+             shiny::tableOutput("stats"))
+  )
+}
+
 #' @noRd
 dcr_gadget_ui <- function(tool) {
   tags <- htmltools::tags
@@ -139,7 +159,7 @@ dcr_gadget_ui <- function(tool) {
           ),
           tags$div(id = "tool", class = "dcr-tool", `data-tool` = tool$name,
                    `data-options` = options_json),
-          tags$div(class = "dcr-stats", shiny::tableOutput("stats"))
+          dcr_stats_panel()
         )
       ),
       tags$footer(
@@ -201,6 +221,10 @@ dcr_gadget_server <- function(tool, mode = c("console", "addin"),
     }
 
     output$n <- shiny::renderText({
+      shiny::req(input$tool, !inherits(input$tool, "dcr_spec_error"))
+      paste0("n = ", spec_n(input$tool))
+    })
+    output$n_sum <- shiny::renderText({
       shiny::req(input$tool, !inherits(input$tool, "dcr_spec_error"))
       paste0("n = ", spec_n(input$tool))
     })

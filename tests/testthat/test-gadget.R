@@ -351,3 +351,24 @@ test_that("dcr_fields_input() builds keyed or unkeyed fields", {
   expect_match(html, 'aria-label="group"', fixed = TRUE)
   expect_match(html, 'type="text"', fixed = TRUE)
 })
+
+test_that("the statistics panel is a collapsed, labelled toggle", {
+  html <- as.character(dcr_gadget_ui(helper_tool()))
+  expect_match(html, 'id="dcr-stats-toggle"', fixed = TRUE)
+  expect_match(html, 'aria-expanded="false"', fixed = TRUE)
+  expect_match(html, 'aria-controls="dcr-stats-body"', fixed = TRUE)
+  expect_match(html, 'data-dcr-toggle="stats"', fixed = TRUE)
+  expect_match(html, '<div id="dcr-stats-body"[^>]*hidden', perl = TRUE)
+  expect_match(html, 'id="n_sum"', fixed = TRUE)
+  expect_match(html, 'id="stats"', fixed = TRUE)
+  # the toggle is a real button inside the main column, before the table
+  expect_match(html, '<button type="button" id="dcr-stats-toggle"', fixed = TRUE)
+  expect_lt(regexpr("dcr-stats-toggle", html), regexpr("dcr-stats-body", html))
+})
+
+test_that("the summary output shows the current n", {
+  shiny::testServer(dcr_gadget_server(helper_tool(), "console"), {
+    session$setInputs(tool = helper_histogram())
+    expect_equal(output$n_sum, "n = 10")
+  })
+})
