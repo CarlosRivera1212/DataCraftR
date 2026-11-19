@@ -2651,6 +2651,63 @@ run_check("Regression strokes", engine("regression"), paste0(rg_script, "
 "))
 
 # Presets, level, equation, xlim, groups and controls.
+run_check("Regression end handles", engine("regression"), paste0(rg_script, "
+  (function () {
+    var ok = [], t, a, b, d0, f0, i, jump, f;
+    ['pull', 'paint'].forEach(function (mode) {
+      // right end down by 20: f(10) = -10, f(0) = 0, f(5) = -5 (exact ramp), one entry
+      t = mk('A', [0, 10]); t.setControl('mode', mode);
+      d0 = t.history._index; f0 = t.state.f[0].slice();
+      a = px(t, 10, 10); b = px(t, 10, -10);
+      stroke(t, [a, [a[0], a[1] + 5], b]);
+      f = t.state.f[0];
+      ok.push(t.history._index === d0 + 1);
+      ok.push(near(f[200], -10, 1e-9) && near(f[0], 0, 1e-9) && near(f[100], -5, 1e-9) &&
+              near(f[150], 7.5 - 20 * 0.75, 1e-9));
+      t.undo(); ok.push(t.state.f[0].join() === f0.join());
+      // left end: only the left moves (mirror ramp)
+      t = mk('A', [0, 10]); t.setControl('mode', mode);
+      a = px(t, 0, 0); b = px(t, 0, 4);
+      stroke(t, [a, [a[0], a[1] - 5], b]);
+      f = t.state.f[0];
+      ok.push(near(f[0], 4, 1e-9) && near(f[200], 10, 1e-9) && near(f[100], 5 + 2, 1e-9));
+    });
+    // no jump at grab: the first move past the dead zone moves by that distance only
+    t = mk('A', [0, 10]); a = px(t, 10, 10.4);       // grabbed 0.4 units above the end, inside the hit radius
+    t._pointerDown({button: 0, pointerId: 1, clientX: a[0], clientY: a[1]});
+    ok.push(!!t._stroke && t._stroke.end === 'R');
+    t._pointerMove({pointerId: 1, clientX: a[0], clientY: a[1] + 1});     // under the dead zone
+    ok.push(t.state.f[0][200] === 10);
+    t._pointerMove({pointerId: 1, clientX: a[0], clientY: a[1] + 4});     // 4 px = 4 percent of the y range
+    jump = 10 - t.state.f[0][200];
+    ok.push(jump > 0 && jump < 0.1 * (t.ui.ylim[1] - t.ui.ylim[0]) + 1e-9 && t.state.f[0][0] === 0);
+    t._pointerUp({pointerId: 1});
+    // presses on a handle that move < 3 px commit nothing
+    t = mk('A', [0, 10]); d0 = t.history._index;
+    for (i = 0; i < 50; i++) {
+      a = px(t, i % 2 ? 0 : 10, i % 2 ? 0 : 10);
+      t._pointerDown({button: 0, pointerId: 1, clientX: a[0], clientY: a[1]});
+      t._pointerMove({pointerId: 1, clientX: a[0] + 1, clientY: a[1] + 1});
+      t._pointerUp({pointerId: 1});
+    }
+    ok.push(t.history._index === d0 && !t._stroke);
+    // error target: the end is just a brush press (no handle), a stale stroke self-heals
+    t = mk('A', [0, 10]); t.setControl('target', 'error'); a = px(t, 10, 10);
+    t._pointerDown({button: 0, pointerId: 1, clientX: a[0], clientY: a[1]});
+    ok.push(t._stroke.end === null); t._pointerUp({pointerId: 1});
+    t = mk('A', [0, 10]); a = px(t, 10, 10);
+    t._pointerDown({button: 0, pointerId: 1, clientX: a[0], clientY: a[1]});     // never ended
+    t._pointerDown({button: 0, pointerId: 1, clientX: a[0], clientY: a[1]});
+    t._pointerUp({pointerId: 1});
+    ok.push(!t._stroke && t.history._index === 0);
+    // a press away from the ends is the ordinary brush
+    t = mk('A', [0, 10]); a = px(t, 5, 5);
+    t._pointerDown({button: 0, pointerId: 1, clientX: a[0], clientY: a[1]});
+    ok.push(t._stroke.end === null); t._pointerUp({pointerId: 1});
+    return ok.join(',');
+  })()
+"))
+
 run_check("Regression controls", engine("regression"), paste0(rg_script, "
   (function () {
     var R = DCR.tools.regression, ok = [], t, depth, i, a, b;

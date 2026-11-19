@@ -23,6 +23,7 @@
   var BRUSH = [0.005, 1], BRUSH_STEP = 0.005;
   var PREVIEW_PX = 26;
   var PREVIEW_MAX = 300;      // preview points per group
+  var HANDLE_HIT = 10;        // px: grab radius of a curve end handle
   var DEAD_ZONE = 3;          // px: a press that moves less than this is a click
   var LEVEL_REST = 400;       // ms: the level slider counts as released
   var PRESETS = ["const", "cone", "rcone", "bowtie", "bulge"];
@@ -139,6 +140,18 @@
   function pull(snap, xs, x0, dy, sigma) {
     var out = new Array(snap.length);
     for (var i = 0; i < snap.length; i++) out[i] = snap[i] + dy * weight(xs[i], x0, sigma);
+    return out;
+  }
+
+  // End drag: the snapshot plus a linear ramp of height dy at the grabbed end
+  // (end "R": 0 at xs[0] up to dy at the last x; "L": the mirror), so the
+  // opposite end stays put and the shape is otherwise kept.
+  function ramp(snap, xs, end, dy) {
+    var a = xs[0], d = xs[xs.length - 1] - a, out = new Array(snap.length);
+    for (var i = 0; i < snap.length; i++) {
+      var t = (xs[i] - a) / d;
+      out[i] = snap[i] + dy * (end === "R" ? t : 1 - t);
+    }
     return out;
   }
 
@@ -622,6 +635,22 @@
       };
     },
 
+    // Which end handle of the active curve is under the pointer ("L", "R" or
+    // null); only while the target is the curve.
+    _hitEnd: function (ev) {
+      if (!this._geo || this.ui.target !== "curve") return null;
+      var r = this.el.getBoundingClientRect(), L = this._geo, s = this.state, yl = this.ui.ylim;
+      var f = s.f[this.activeIndex()], px = ev.clientX - r.left, py = ev.clientY - r.top;
+      var best = null, bd = HANDLE_HIT, ends = [["L", 0, f[0]], ["R", 1, f[f.length - 1]]];
+      ends.forEach(function (e) {
+        var hx = L.left + e[1] * L.width;
+        var hy = L.top + L.height - (e[2] - yl[0]) / (yl[1] - yl[0]) * L.height;
+        var d = Math.hypot(px - hx, py - hy);
+        if (d <= bd) { bd = d; best = e[0]; }
+      });
+      return best;
+    },
+
     _pointerDown: function (ev) {
       if (ev.button !== 0 || !this._geo) return;
       if (this._stroke) {
@@ -632,12 +661,12 @@
         this._pointerUp({ pointerId: old.id });
       }
       this._flushLevel();
-      var p = this._toData(ev);
-      if (!p.inside) return;
+      var p = this._toData(ev), end = this._hitEnd(ev);
+      if (!p.inside && !end) return;
       this._dom.svg.setPointerCapture(ev.pointerId);
       var i = this.activeIndex(), s = this.state, xs = grid(s.xlim, s.f[i].length);
       this._stroke = {
-        id: ev.pointerId, i: i, target: this.ui.target, mode: this.ui.mode,
+        id: ev.pointerId, i: i, target: this.ui.target, mode: this.ui.mode, end: end,
         x0: p.x, y0: p.yRaw, cx: ev.clientX, cy: ev.clientY, moved: false,
         sigma: this._sigma(), xs: xs,
         sgn: p.yRaw >= interpAt(xs, s.f[i], p.x) ? 1 : -1,   // side of the curve grabbed
@@ -653,6 +682,9 @@
       if (!this._geo) return;
       var p = this._toData(ev);
       this._cursor = p.inside || st ? p.x : null;
+      if (this._dom && this._dom.svg.style) {
+        this._dom.svg.style.cursor = (st ? st.end : this._hitEnd(ev)) ? "ns-resize" : "";
+      }
       if (st && ev.pointerId === st.id && !st.moved &&
           Math.hypot(ev.clientX - st.cx, ev.clientY - st.cy) >= DEAD_ZONE) {
         st.moved = true;
@@ -661,7 +693,9 @@
       if (st && ev.pointerId === st.id && st.moved) {
         var s = this.state, t = now(), dt = t - st.last;
         if (st.target === "curve") {
-          if (st.mode === "pull") {
+          if (st.end) {
+            s.f[st.i] = ramp(st.startF, st.xs, st.end, p.yRaw - st.y0);
+          } else if (st.mode === "pull") {
             s.f[st.i] = pull(st.startF, st.xs, st.x0, p.yRaw - st.y0, st.sigma);
           } else {
             paint(s.f[st.i], st.xs, p, this._sigma(), dt);
@@ -797,6 +831,11 @@
         note: document.createElement("div"),
         mini: document.createElement("div")
       };
+      dom.handles = svg.append("g").style("pointer-events", "none");
+      dom.hEnds = [0, 1].map(function () {
+        return dom.handles.append("circle").attr("r", 5.5).attr("stroke", "#fff")
+          .attr("stroke-width", 1.5).style("display", "none");
+      });
       dom.curves = dom.plot.append("g");
       dom.points = dom.plot.append("g");
       dom.cursorLine = dom.plot.append("line").attr("stroke", "#447099")
@@ -950,6 +989,15 @@
           item.in1.attr("d", u1);
           item.in2.attr("d", l1);
         }
+      });
+
+      // end handles of the active curve (not clipped, so they sit on the frame)
+      var fa = s.f[act];
+      dom.hEnds.forEach(function (h, e) {
+        h.style("display", edit ? "none" : null)
+          .attr("cx", L.left + e * L.width)
+          .attr("cy", Y(fa[e ? K - 1 : 0]))
+          .attr("fill", DCR.palette[act % 10]);
       });
 
       // sample preview and the residual mini plot

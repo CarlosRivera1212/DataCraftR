@@ -399,6 +399,8 @@ Run `dcr_regression()` (also with `groups = c("A", "B", "C")` for the group step
       far from the curve) and the ends are free to move. Curve + Paint: the
       curve relaxes towards the cursor height while you move; ends included.
       Both can leave the 0..1 region; the y axis refits when you let go.
+- [ ] Curve target: drag the curve's end dots (Pull and Paint): y = x can be
+      turned into y = -x; the far end stays fixed, one undo restores.
 - [ ] Error + Pull: press above the curve and drag away from it: the band
       widens; drag toward the curve: it narrows, never past zero. Pressing below
       the curve works the same (away widens).

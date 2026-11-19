@@ -2,6 +2,10 @@
 
 * Statistics panel is collapsible (collapsed by default) in every tool;
   consistent icons on all sidebar controls and the toolbar.
+* Density shape buttons (and the boxplot / count action buttons) stack
+  vertically in the sidebar.
+* Bivariate "Reset axes" now fits every group's 2-sigma ellipse.
+* Regression: drag the end dots of the curve to tilt it (y = x into y = -x).
 
 # DataCraftR 0.5.5
 
