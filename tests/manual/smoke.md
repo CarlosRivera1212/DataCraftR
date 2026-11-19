@@ -257,6 +257,10 @@ Start: `df <- dcr_scatter()` (groups A, B, C; x and y ranges 0 to 10).
       becomes active even over the active group's rings. Switch Handles <->
       Gestures mid-session: both keep working on the same ellipses; each drag
       is one undo step and clicks without movement add none.
+- [ ] Gestures: after pulling an axis to its minimum, it can be stretched back
+      out (may take two strokes; Handles works too). With "Fit axes
+      automatically" off, a stretch stops just before the grabbed side's ring
+      would leave the plot.
 - [ ] Click inside another group's 2-sigma ellipse: it becomes the active group
       (sidebar buttons follow) and nothing is added to the undo history.
       Keys `1`-`2` do the same.

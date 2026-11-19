@@ -572,7 +572,13 @@
         var pr = st.sg * ((p.x - e.mx) * st.dir.x + (p.y - e.my) * st.dir.y);
         var sd = st.start[st.axis] * Math.max(pr, 0) / st.pro0;
         sd = clampSd(sd, st.axis === "s1" ? e.s2 : e.s1, smin, smax);
-        if (!this.ui.autofit) sd = capSd(sd, e.mx, e.my, st.sg * st.dir.x, st.sg * st.dir.y, s, smin);
+        if (!this.ui.autofit) {
+          // keep the grabbed side's ring (2 sigma + 0.15 u) in view, never
+          // below the grab-time sd (no jump when it already sticks out)
+          var rch = reach(e.mx, e.my, st.sg * st.dir.x, st.sg * st.dir.y, s.xlim, s.ylim);
+          var cap = Math.max((rch - 0.15 * this._unit()) / 2, st.start[st.axis]);
+          sd = Math.max(smin, Math.min(sd, cap));
+        }
         e[st.axis] = sd;
       } else {
         // signed projection on the (fixed) minor axis, relative to the grab:

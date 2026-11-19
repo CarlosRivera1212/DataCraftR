@@ -1580,6 +1580,9 @@ run_check("Bivariate gestures", engine("bivariate"), paste0(bv_script, "
       t._dom.svg.style = {};
       return t;
     }
+    function setEll(t, i, ell) {      // a committed (undoable) ellipse
+      var next = copyOf(t.state); next.ell[i] = copyOf(ell); t.commit(next);
+    }
     function down(t, x, y, o) {
       var q = px(t, x, y), ev = {button: 0, pointerId: 1, clientX: q[0], clientY: q[1]};
       for (var k in (o || {})) ev[k] = o[k];
@@ -1696,8 +1699,37 @@ run_check("Bivariate gestures", engine("bivariate"), paste0(bv_script, "
     e = t.state.ell[0];
     ok.push(near(e.mx, 6, 1e-6) && near(e.my, 6, 1e-6) && e.s1 === 1 && e.s2 === 0.5);
     t = gt({}, E);
+    t.ui.autofit = false;
     drag(t, [5, 5], [[20, 5]]);
-    ok.push(t.state.ell[0].mx === 10 || t.state.xlim[1] >= 10);
+    ok.push(t.state.ell[0].mx === 10 && same(t.state.xlim, [0, 10]));
+    t = gt({}, E);                                    // autofit on: the view grows to hold it
+    drag(t, [5, 5], [[20, 5]]);
+    ok.push(t.state.ell[0].mx === 10 && t.state.xlim[1] > 10 &&
+            B().contains(t.state.xlim, t.state.ylim, t.state.ell));
+
+    // autofit off: a stretched sd is capped so the grabbed side's ring stays in view
+    // ((reach - 0.15 u) / 2); reach is measured on the grabbed side
+    var E7 = {mx: 7, my: 5, s1: 1, s2: 0.5, th: 0};
+    t = gt({}, E7); t.ui.autofit = false;
+    drag(t, [9.6, 5], [[30, 5]]);
+    ok.push(near(t.state.ell[0].s1, (3 - 0.15) / 2, 1e-9) && t.state.ell[0].s2 === 0.5);
+    t = gt({}, E7); t.ui.autofit = false;
+    drag(t, [4.4, 5], [[-20, 5]]);                    // far side: reach 7 to the left, not 3
+    ok.push(near(t.state.ell[0].s1, (7 - 0.15) / 2, 1e-9));
+    t = gt({}, E7); t.ui.autofit = false;
+    drag(t, [7, 6.6], [[7, 40]]);                     // minor axis upwards: reach 5
+    ok.push(near(t.state.ell[0].s2, (5 - 0.15) / 2, 1e-9) && t.state.ell[0].s1 === 1);
+    t = gt({}, E7); t.ui.autofit = false;
+    drag(t, [9.6, 5], [[8.3, 5]]);                    // shrinking is not capped
+    ok.push(near(t.state.ell[0].s1, 1 * 1.3 / 2.6, 1e-9));
+    // autofit on: stretching past the view grows the limits in the same entry; one undo restores both
+    t = gt({}, E); setEll(t, 0, E); d0 = t.history._index;
+    var lim0 = copyOf(t.state.xlim);
+    drag(t, [7.6, 5], [[12, 5]]);
+    ok.push(t.history._index === d0 + 1 && t.state.xlim[1] > 10 && near(t.state.ell[0].s1, 7 / 2.6, 1e-9) &&
+            B().contains(t.state.xlim, t.state.ylim, t.state.ell));
+    t.undo();
+    ok.push(same(t.state.xlim, lim0) && same(t.state.ell[0], E) && t.history._index === d0);
 
     // 200 presses without movement in each zone, on empty canvas and in another group: no history, no freeze
     t = mk(['A', 'B']); t.ui.mode = 'gestures'; t._dom.svg.style = {};
@@ -1719,14 +1751,16 @@ run_check("Bivariate gestures", engine("bivariate"), paste0(bv_script, "
       stroke(t, [[a[0], a[1]], [a[0] + 2.9, a[1]]]);
     });
     ok.push(t.history._index === d0);
-    // a real drag in each zone is exactly one entry; undo restores
-    var before = copyOf(mk(['A', 'B']).state.ell[0]);   // the history's initial state
-    var moved0 = copyOf(t.state.ell[0]);
-    drag(t, [5.6, 3], [[6.0, 3], [6.5, 3]]);
-    drag(t, [3, 3], [[3.5, 3.2]]);
-    ok.push(t.history._index === d0 + 2);
-    t.undo(); t.undo();
-    ok.push(same(t.state.ell[0], before) && !same(before, moved0));
+    // a real drag in each zone is exactly one entry; each undo restores the shape before that drag
+    setEll(t, 0, {mx: 3, my: 3, s1: 1, s2: 0.5, th: 0}); d0 = t.history._index;
+    var sh0 = copyOf(t.state.ell[0]);
+    drag(t, [5.6, 3], [[6.0, 3], [6.5, 3]]);                 // stretch
+    var sh1 = copyOf(t.state.ell[0]);
+    drag(t, [3, 3], [[3.5, 3.2]]);                           // move
+    var sh2 = copyOf(t.state.ell[0]);
+    ok.push(t.history._index === d0 + 2 && !same(sh0, sh1) && !same(sh1, sh2));
+    t.undo(); ok.push(same(t.state.ell[0], sh1));
+    t.undo(); ok.push(same(t.state.ell[0], sh0) && t.history._index === d0);
     // in Gestures mode the handles are not hit; in Handles mode the ring/stretch zones are not
     t = mk(['A']); t.ui.mode = 'gestures'; t._dom.svg.style = {}; t.state.ell[0] = copyOf(E);
     d0 = t.history._index;
