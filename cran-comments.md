@@ -7,12 +7,15 @@ mosaic, regression curve, radar). See NEWS.md.
 The old functions `scatter_dcr()`, `boxplot_dcr()`, `histogram_dcr()` and
 `count_dcr()` are deprecated, not removed. They now return the data frame
 instead of writing a temporary file.
-
 ## Test environments
 
 * Windows 11, R 4.5.2 (local)
+* win-builder: Windows, R-devel (2026-11-17 r90926 ucrt)
 
 ## R CMD check results
 
-0 errors | 0 warnings | 0 notes, apart from notes caused by the local
-machine (no LaTeX or pandoc installed, and "unable to verify current time").
+Local (R 4.5.2): 0 errors | 0 warnings | 0 relevant notes. The only notes come
+from the local machine (no LaTeX or pandoc installed, and "unable to verify
+current time").
+
+win-builder (R-devel): Status OK, with no errors, warnings or notes.
