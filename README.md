@@ -104,7 +104,7 @@ In a separate spatial / temporal package:
 ## Citation
 
 > Rivera, C. (2026). _DataCraftR: Create Datasets Interactively Using
-> 'shiny'._ R package version 0.4.0.
+> 'shiny'._ R package version 0.5.6.
 > <https://github.com/CarlosRivera1212/DataCraftR>
 
 ## License

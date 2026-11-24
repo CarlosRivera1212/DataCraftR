@@ -11,3 +11,5 @@
 ^AGENTS\.md$
 ^tools$
 ^tests/manual$
+^ROADMAP\.md$
+^cran-comments\.md$
