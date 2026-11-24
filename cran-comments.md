@@ -7,6 +7,7 @@ mosaic, regression curve, radar). See NEWS.md.
 The old functions `scatter_dcr()`, `boxplot_dcr()`, `histogram_dcr()` and
 `count_dcr()` are deprecated, not removed. They now return the data frame
 instead of writing a temporary file.
+
 ## Test environments
 
 * Windows 11, R 4.5.2 (local)
